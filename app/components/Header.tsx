@@ -137,7 +137,10 @@ export default function Header() {
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: -10, scale: 0.95 }}
                           transition={{ duration: 0.2 }}
-                          className="absolute right-0 mt-3 w-64 rounded-2xl shadow-2xl overflow-hidden bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50"
+                          className="absolute right-0 mt-3 w-64 rounded-2xl shadow-2xl overflow-hidden 
+                                     bg-white/90 dark:bg-gray-800/95 backdrop-blur-xl 
+                                     border border-gray-200/50 dark:border-gray-700/50 
+                                     text-gray-800 dark:text-gray-100"
                         >
                           {/* User Info */}
                           <div className="p-4 border-b border-gray-200/50 dark:border-gray-700/50">
@@ -146,7 +149,7 @@ export default function Header() {
                                 {avatarLetter}
                               </div>
                               <div>
-                                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                <p className="text-sm font-semibold">
                                   {displayName}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
@@ -281,7 +284,7 @@ export default function Header() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold">{displayName}</p>
-                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                               <Mail className="w-3 h-3" />
                               {user.email}
                             </p>
@@ -305,7 +308,7 @@ export default function Header() {
 
                         {/* Theme Toggle in Mobile Profile */}
                         <div className="flex items-center justify-between px-2 py-3">
-                          <span className="text-sm font-medium">Theme</span>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Theme</span>
                           <ThemeToggle />
                         </div>
 
@@ -322,7 +325,7 @@ export default function Header() {
                         <Link
                           href="/login"
                           onClick={() => setIsMenuOpen(false)}
-                          className="block w-full text-center py-3.5 rounded-xl font-semibold bg-gray-100/80 dark:bg-gray-700/70 backdrop-blurb-md text-gray-800 dark:text-gray-200 border border-gray-300/50 dark:border-gray-600/50 hover:bg-gray-200 dark:hover:bg-gray-600/80 transition-all duration-300"
+                          className="block w-full text-center py-3.5 rounded-xl font-semibold bg-gray-100/80 dark:bg-gray-700/70 backdrop-blur-md text-gray-800 dark:text-gray-200 border border-gray-300/50 dark:border-gray-600/50 hover:bg-gray-200 dark:hover:bg-gray-600/80 transition-all duration-300"
                         >
                           Login
                         </Link>
