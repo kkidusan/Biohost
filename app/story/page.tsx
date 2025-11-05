@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   motion,
   AnimatePresence,
@@ -11,7 +10,7 @@ import {
   EditorContent,
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Image as TiptapImage } from "@tiptap/extension-image"; // <-- Only for config
+import { Image as TiptapImage } from "@tiptap/extension-image";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Link } from "@tiptap/extension-link";
 import { TextAlign } from "@tiptap/extension-text-align";
@@ -28,7 +27,6 @@ import { Color } from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { FontFamily } from "@tiptap/extension-font-family";
 import { Extension } from "@tiptap/core";
-
 import {
   Bold as BoldIcon,
   Italic as ItalicIcon,
@@ -42,7 +40,7 @@ import {
   AlignRight,
   AlignJustify,
   Highlighter,
-  Image as ImageIcon, // <-- This is the ICON, not Tiptap's Image
+  Image as ImageIcon,
   Plus,
   Trash2,
   Edit2,
@@ -61,12 +59,10 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  Home,
   Palette,
-  Save,
-  ChevronUp,
+  Check,
+  X,
 } from "lucide-react";
-
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebaseconfig";
 import {
@@ -82,7 +78,6 @@ import {
   getDocs,
   deleteDoc,
 } from "firebase/firestore";
-
 import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
@@ -109,10 +104,10 @@ interface WritingStyle {
   prompt: string;
 }
 const STYLES: WritingStyle[] = [
-  { name: "Memoir",   icon: BookOpen, prompt: "Write in a warm, reflective tone…" },
-  { name: "Adventure",icon: Zap,      prompt: "Epic, vivid, sensory details…" },
-  { name: "Journal",  icon: PenTool,  prompt: "Today I felt… Here's what happened…" },
-  { name: "Poetry",   icon: Heart,    prompt: "Free verse, metaphors, rhythm…" },
+  { name: "Memoir", icon: BookOpen, prompt: "Write in a warm, reflective tone…" },
+  { name: "Adventure", icon: Zap, prompt: "Epic, vivid, sensory details…" },
+  { name: "Journal", icon: PenTool, prompt: "Today I felt… Here's what happened…" },
+  { name: "Poetry", icon: Heart, prompt: "Free verse, metaphors, rhythm…" },
 ];
 
 /* ────── Font-Size Extension ────── */
@@ -138,16 +133,29 @@ const FontSize = Extension.create({
   },
 });
 
+/* ────── MOBILE DETECTION ────── */
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+};
+
 /* ──────────────────────── MAIN COMPONENT ──────────────────────── */
 export default function StoryStudio() {
   const { user, isLoggedIn } = useAuth();
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   /* ────── GLOBAL STATE ────── */
   const [mode, setMode] = useState<"list" | "editor">("list");
   const [books, setBooks] = useState<Array<{ id: string; title: string; cover?: string }>>([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
-  const [showMyStories, setShowMyStories] = useState(false);
 
   /* ────── EDITOR STATE ────── */
   const [bookId, setBookId] = useState<string | null>(null);
@@ -159,18 +167,18 @@ export default function StoryStudio() {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [style, setStyle] = useState<WritingStyle>(STYLES[0]);
   const [activeTab, setActiveTab] = useState<"home" | "insert" | "style">("home");
-
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "offline" | "error">("saved");
   const [isPreview, setIsPreview] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const hasUnsavedChanges = useRef(false);
   const navigationConfirmed = useRef(false);
   const isOnline = useRef(true);
+  const saveTimeout = useRef<NodeJS.Timeout>();
 
-  /* ────── TIPTAP EDITOR (FULL SCREEN PAGE) ────── */
+  /* ────── TIPTAP EDITOR ────── */
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -194,8 +202,8 @@ export default function StoryStudio() {
     content: "",
     editorProps: {
       attributes: {
-        class: "prose prose-lg max-w-none focus:outline-none min-h-full",
-        style: "font-family: Georgia, serif; line-height: 1.7; padding: 2.5cm 2cm;",
+        class: "prose prose-lg max-w-none focus:outline-none min-h-full p-8 m-0",
+        style: "font-family: Georgia, serif; line-height: 1.7;",
       },
     },
     onUpdate: ({ editor }) => {
@@ -264,7 +272,6 @@ export default function StoryStudio() {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-
     try {
       await setDoc(doc(db, "books", newId), defaultData);
       setBooks((prev) => [...prev, { id: newId, title: defaultData.title, cover: "" }]);
@@ -300,7 +307,6 @@ export default function StoryStudio() {
     try {
       const snap = await getDoc(doc(db, "books", docId));
       let data: any = {};
-
       if (snap.exists()) {
         data = snap.data();
       } else {
@@ -310,13 +316,11 @@ export default function StoryStudio() {
           toast.success("Recovered offline backup");
         }
       }
-
       const defaultChapter: Chapter = {
         id: "1",
         title: "Chapter 1: My Journey Begins",
         pages: [{ id: "p1", title: "Page 1", content: null, html: "" }],
       };
-
       setBookTitle(data.title || "My Life Story");
       setCoverImage(data.coverImage || "");
       setChapters(data.chapters?.length ? data.chapters : [defaultChapter]);
@@ -331,43 +335,42 @@ export default function StoryStudio() {
     }
   };
 
-  /* ────── SAVE LOGIC ────── */
-  const triggerSave = async () => {
+  /* ────── DEBOUNCED SAVE ────── */
+  const triggerSave = useCallback(() => {
     if (!bookId || !user?.email) return;
-
     const backup = { title: bookTitle, coverImage, chapters, style: style.name, wordCount: totalWords };
     localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(backup));
-
     if (!isOnline.current) {
       setSaveStatus("offline");
       hasUnsavedChanges.current = true;
       return;
     }
-
+    clearTimeout(saveTimeout.current);
     setSaveStatus("saving");
     hasUnsavedChanges.current = true;
-
-    try {
-      await setDoc(
-        doc(db, "books", bookId),
-        {
-          title: bookTitle,
-          authorEmail: user.email,
-          coverImage,
-          chapters,
-          style: style.name,
-          wordCount: totalWords,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-      setSaveStatus("saved");
-      hasUnsavedChanges.current = false;
-      localStorage.removeItem(LOCAL_BACKUP_KEY);
-    } catch {
-      setSaveStatus("error");
-    }
-  };
+    saveTimeout.current = setTimeout(async () => {
+      try {
+        await setDoc(
+          doc(db, "books", bookId),
+          {
+            title: bookTitle,
+            authorEmail: user.email,
+            coverImage,
+            chapters,
+            style: style.name,
+            wordCount: totalWords,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+        setSaveStatus("saved");
+        hasUnsavedChanges.current = false;
+        localStorage.removeItem(LOCAL_BACKUP_KEY);
+      } catch {
+        setSaveStatus("error");
+      }
+    }, 1000);
+  }, [bookId, user?.email, bookTitle, coverImage, chapters, style.name, totalWords]);
 
   const updatePageContent = (json: any, html: string) => {
     setChapters((prev) =>
@@ -384,14 +387,16 @@ export default function StoryStudio() {
     );
   };
 
-  /* ────── EDITOR SYNC ────── */
+  /* ────── EDITOR SYNC (FIXED: No preserveWhitespace) ────── */
   useEffect(() => {
     if (!editor || !currentChapter) return;
     const page = currentChapter.pages[activePageIdx];
-    if (page?.content) {
-      editor.commands.setContent(page.content);
+    const currentJSON = editor.getJSON();
+
+    if (page?.content && JSON.stringify(currentJSON) !== JSON.stringify(page.content)) {
+      editor.commands.setContent(page.content); // Removed invalid option
       editor.commands.focus();
-    } else {
+    } else if (!page?.content && currentJSON.content?.length) {
       editor.commands.setContent("");
     }
   }, [activeChapterIdx, activePageIdx, editor, currentChapter]);
@@ -412,7 +417,7 @@ export default function StoryStudio() {
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
     };
-  }, []);
+  }, [triggerSave]);
 
   /* ────── CHAPTER CRUD ────── */
   const addChapter = () => {
@@ -424,7 +429,7 @@ export default function StoryStudio() {
     setChapters((c) => [...c, newCh]);
     setActiveChapterIdx(chapters.length);
     setActivePageIdx(0);
-    setOpenChapters((s) => new Set([newCh.id]));
+    setOpenChapters(new Set([newCh.id])); // Only new chapter open
     toast.success("Chapter added");
     triggerSave();
   };
@@ -440,13 +445,10 @@ export default function StoryStudio() {
     triggerSave();
   };
 
-  const toggleChapter = (id: string) => {
-    setOpenChapters((s) => {
-      const copy = new Set(s);
-      copy.clear();
-      copy.add(id);
-      return copy;
-    });
+  const selectChapter = (idx: number, chapterId: string) => {
+    setActiveChapterIdx(idx);
+    setActivePageIdx(0);
+    setOpenChapters(new Set([chapterId])); // Collapse all others
   };
 
   /* ────── PAGE CRUD ────── */
@@ -481,22 +483,13 @@ export default function StoryStudio() {
     triggerSave();
   };
 
-  const reorderPages = (newOrder: Page[]) => {
-    setChapters((c) =>
-      c.map((ch, i) => (i === activeChapterIdx ? { ...ch, pages: newOrder } : ch))
-    );
-    triggerSave();
-  };
-
   /* ────── IMAGE UPLOAD ────── */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editor) return;
-
     const form = new FormData();
     form.append("file", file);
     form.append("upload_preset", UPLOAD_PRESET);
-
     try {
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
         method: "POST",
@@ -544,7 +537,6 @@ export default function StoryStudio() {
           ?.map((n: any) => (n.type === "text" ? n.text : ""))
           .join(" ")
           .slice(0, 200) + "...";
-
       const payload = {
         title: bookTitle,
         author: user.fullName || user.email,
@@ -558,10 +550,8 @@ export default function StoryStudio() {
         wordCount: totalWords,
         updatedAt: serverTimestamp(),
       };
-
       const q = query(collection(db, "biographies"), where("authorEmail", "==", user.email));
       const snap = await getDocs(q);
-
       if (!snap.empty) {
         await updateDoc(snap.docs[0].ref, payload);
         toast.success("Story updated!");
@@ -569,7 +559,6 @@ export default function StoryStudio() {
         await addDoc(collection(db, "biographies"), { ...payload, createdAt: serverTimestamp() });
         toast.success("Story published!");
       }
-
       navigationConfirmed.current = true;
       router.push("/read");
     } catch (e) {
@@ -610,6 +599,29 @@ export default function StoryStudio() {
     setMode("list");
   };
 
+  /* ────── TOOL BUTTON & DIVIDER ────── */
+  const ToolButton = ({ children, active = false, disabled = false, onClick }: {
+    children: React.ReactNode;
+    active?: boolean;
+    disabled?: boolean;
+    onClick: () => void;
+  }) => (
+    <motion.button
+      whileHover={{ scale: disabled ? 1 : 1.1 }}
+      whileTap={{ scale: disabled ? 1 : 0.95 }}
+      onClick={onClick}
+      disabled={disabled}
+      className={`p-2 rounded-lg transition-all ${
+        active
+          ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
+          : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+    >
+      {children}
+    </motion.button>
+  );
+  const Divider = () => <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />;
+
   /* ────── RENDER ────── */
   if (!isLoggedIn) {
     return (
@@ -632,7 +644,6 @@ export default function StoryStudio() {
               </h1>
               <p className="mt-2 text-gray-600 dark:text-gray-300">Pick or create your story</p>
             </div>
-
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
@@ -642,13 +653,11 @@ export default function StoryStudio() {
               <Plus className="h-6 w-6" />
               Create New Book
             </motion.button>
-
             {loadingBooks ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
               </div>
             ) : null}
-
             <AnimatePresence>
               {books.length > 0 && !loadingBooks && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -663,7 +672,7 @@ export default function StoryStudio() {
                       className="group relative bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden cursor-pointer"
                       onClick={() => enterEditor(b.id)}
                     >
-                      <div className="aspect-[3/4] bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600">
+                      <div className="aspect-3/4 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600">
                         {b.cover ? (
                           <img src={b.cover} alt={b.title} className="w-full h-full object-cover" />
                         ) : (
@@ -699,7 +708,6 @@ export default function StoryStudio() {
                 </motion.div>
               )}
             </AnimatePresence>
-
             {!loadingBooks && books.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-30" />
@@ -712,11 +720,10 @@ export default function StoryStudio() {
     );
   }
 
-  /* ────── EDITOR SCREEN (FULL SCREEN PAGE, NO SCROLL) ────── */
+  /* ────── EDITOR SCREEN ────── */
   return (
     <>
       <Toaster position="top-center" />
-
       {/* UNSAVED DIALOG */}
       <AnimatePresence>
         {showUnsavedDialog && (
@@ -748,193 +755,162 @@ export default function StoryStudio() {
         )}
       </AnimatePresence>
 
-      {/* FULL SCREEN PAGE (NO SCROLL) */}
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-indigo-900 dark:to-purple-900 overflow-hidden">
-        {/* TOP BAR */}
-        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMode("list")}
-              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <input
-              type="text"
-              value={bookTitle}
-              onChange={(e) => { setBookTitle(e.target.value); triggerSave(); }}
-              className="text-2xl font-bold bg-transparent outline-none"
-              placeholder="My Life Story"
-            />
+      {/* TOP BAR */}
+      <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (hasUnsavedChanges.current && !navigationConfirmed.current) {
+                setShowUnsavedDialog(true);
+              } else {
+                setMode("list");
+              }
+            }}
+            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <input
+            type="text"
+            value={bookTitle}
+            onChange={(e) => { setBookTitle(e.target.value); triggerSave(); }}
+            className="text-2xl font-bold bg-transparent outline-none"
+            placeholder="My Life Story"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-sm font-medium">
+            {totalWords} words
           </div>
-
-          {/* MY STORIES + SAVE STATUS */}
-          <div className="relative">
-            <button
-              onClick={() => setShowMyStories(!showMyStories)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium"
-            >
-              <Save className="h-4 w-4" />
-              <span>
-                {saveStatus === "saving" ? "Saving..." :
-                 saveStatus === "saved" ? "Saved" :
-                 saveStatus === "offline" ? "Offline" : "Error"}
-              </span>
-              {showMyStories ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-
-            <AnimatePresence>
-              {showMyStories && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
-                >
-                  <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-                    <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">My Stories</p>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {books.map((b) => (
-                      <button
-                        key={b.id}
-                        onClick={() => { enterEditor(b.id); setShowMyStories(false); }}
-                        className={`w-full text-left px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition ${
-                          b.id === bookId ? "bg-indigo-100 dark:bg-indigo-900/50 font-medium" : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="h-4 w-4" />
-                          <span className="truncate">{b.title}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-                    <button
-                      onClick={() => { createNewBook(); setShowMyStories(false); }}
-                      className="w-full py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg flex items-center justify-center gap-1"
-                    >
-                      <Plus className="h-4 w-4" /> New Book
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-xs">
+            {saveStatus === "saved" && <Check className="h-3 w-3 text-green-500" />}
+            {saveStatus === "saving" && <Loader2 className="h-3 w-3 animate-spin text-amber-500" />}
+            {saveStatus === "offline" && <X className="h-3 w-3 text-red-500" />}
+            {saveStatus === "error" && <X className="h-3 w-3 text-red-500" />}
+            <span className="ml-1">
+              {saveStatus === "saved" ? "Saved" :
+               saveStatus === "saving" ? "Saving…" :
+               saveStatus === "offline" ? "Offline" : "Error"}
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* TOOLBAR */}
-        <div className="fixed top-16 left-0 right-0 z-40 flex border-b border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md">
-          <button
-            onClick={() => setActiveTab("home")}
-            className={`flex-1 py-3 px-6 font-medium transition ${
-              activeTab === "home" ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            <Home className="h-5 w-5 inline mr-2" /> Home
-          </button>
-          <button
-            onClick={() => setActiveTab("insert")}
-            className={`flex-1 py-3 px-6 font-medium transition ${
-              activeTab === "insert" ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            <ImageIcon className="h-5 w-5 inline mr-2" /> Insert
-          </button>
-          <button
-            onClick={() => setActiveTab("style")}
-            className={`flex-1 py-3 px-6 font-medium transition ${
-              activeTab === "style" ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            <Palette className="h-5 w-5 inline mr-2" /> Style
-          </button>
-        </div>
+      {/* Desktop Toolbar */}
+      {!isMobile && (
+        <>
+          <div className="fixed top-16 left-80 right-0 z-40 flex border-b border-gray-200/30 dark:border-gray-700/30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl">
+            {(["home", "insert", "style"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-3 px-6 font-medium text-sm capitalize transition-all duration-200 ${
+                  activeTab === tab
+                    ? "text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                }`}
+              >
+                {tab === "home" && "Format"}
+                {tab === "insert" && "Insert"}
+                {tab === "style" && "Style"}
+              </button>
+            ))}
+          </div>
 
-        {/* TOOLBAR CONTENT */}
-        <div className="fixed top-28 left-0 right-0 z-30 flex flex-wrap items-center gap-1 p-3 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 overflow-x-auto">
-          {activeTab === "home" && (
-            <>
-              <button onClick={() => editor?.chain().focus().toggleBold().run()} className={`p-2 rounded-lg ${editor?.isActive("bold") ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><BoldIcon className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().toggleItalic().run()} className={`p-2 rounded-lg ${editor?.isActive("italic") ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><ItalicIcon className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().toggleStrike().run()} className={`p-2 rounded-lg ${editor?.isActive("strike") ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><Strikethrough className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} className={`p-2 rounded-lg ${editor?.isActive("heading", { level: 1 }) ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><Heading1 className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} className={`p-2 rounded-lg ${editor?.isActive("heading", { level: 2 }) ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><Heading2 className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().toggleBulletList().run()} className={`p-2 rounded-lg ${editor?.isActive("bulletList") ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><List className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().toggleOrderedList().run()} className={`p-2 rounded-lg ${editor?.isActive("orderedList") ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><ListOrdered className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().setTextAlign("left").run()} className={`p-2 rounded-lg ${editor?.isActive({ textAlign: "left" }) ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><AlignLeft className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().setTextAlign("center").run()} className={`p-2 rounded-lg ${editor?.isActive({ textAlign: "center" }) ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><AlignCenter className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().setTextAlign("right").run()} className={`p-2 rounded-lg ${editor?.isActive({ textAlign: "right" }) ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><AlignRight className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().setTextAlign("justify").run()} className={`p-2 rounded-lg ${editor?.isActive({ textAlign: "justify" }) ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><AlignJustify className="h-4 w-4" /></button>
-              <button onClick={() => editor?.chain().focus().toggleHighlight().run()} className={`p-2 rounded-lg ${editor?.isActive("highlight") ? "bg-indigo-100 dark:bg-indigo-900/50" : "bg-gray-50 dark:bg-gray-700"}`}><Highlighter className="h-4 w-4" /></button>
-            </>
-          )}
-
-          {activeTab === "insert" && (
-            <label className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700 cursor-pointer">
-              <ImageIcon className="h-4 w-4" />
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-            </label>
-          )}
-
-          {activeTab === "style" && (
-            <div className="grid grid-cols-2 gap-2 w-full max-w-md">
-              {STYLES.map((s) => (
-                <motion.button
-                  key={s.name}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => { setStyle(s); triggerSave(); }}
-                  className={`p-3 rounded-xl border-2 transition-all text-xs ${
-                    style.name === s.name
-                      ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-md"
-                      : "border-gray-200 dark:border-gray-700 hover:border-indigo-300"
-                  }`}
-                >
-                  <s.icon className="h-5 w-5 mx-auto mb-1 text-indigo-600" />
-                  <p className="font-medium">{s.name}</p>
-                </motion.button>
-              ))}
+          <div className="fixed top-28 left-80 right-0 z-30 flex items-center gap-1.5 p-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30 overflow-x-auto">
+            {activeTab === "home" && (
+              <>
+                <div className="flex items-center gap-1">
+                  <ToolButton active={editor?.isActive("bold")} onClick={() => editor?.chain().focus().toggleBold().run()}><BoldIcon className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive("italic")} onClick={() => editor?.chain().focus().toggleItalic().run()}><ItalicIcon className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive("strike")} onClick={() => editor?.chain().focus().toggleStrike().run()}><Strikethrough className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive("highlight")} onClick={() => editor?.chain().focus().toggleHighlight().run()}><Highlighter className="h-4 w-4" /></ToolButton>
+                </div>
+                <Divider />
+                <div className="flex items-center gap-1">
+                  <ToolButton active={editor?.isActive("heading", { level: 1 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}><Heading1 className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive("heading", { level: 2 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 className="h-4 w-4" /></ToolButton>
+                </div>
+                <Divider />
+                <div className="flex items-center gap-1">
+                  <ToolButton active={editor?.isActive("bulletList")} onClick={() => editor?.chain().focus().toggleBulletList().run()}><List className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive("orderedList")} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-4 w-4" /></ToolButton>
+                </div>
+                <Divider />
+                <div className="flex items-center gap-1">
+                  <ToolButton active={editor?.isActive({ textAlign: "left" })} onClick={() => editor?.chain().focus().setTextAlign("left").run()}><AlignLeft className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive({ textAlign: "center" })} onClick={() => editor?.chain().focus().setTextAlign("center").run()}><AlignCenter className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive({ textAlign: "right" })} onClick={() => editor?.chain().focus().setTextAlign("right").run()}><AlignRight className="h-4 w-4" /></ToolButton>
+                  <ToolButton active={editor?.isActive({ textAlign: "justify" })} onClick={() => editor?.chain().focus().setTextAlign("justify").run()}><AlignJustify className="h-4 w-4" /></ToolButton>
+                </div>
+              </>
+            )}
+            {activeTab === "insert" && (
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium cursor-pointer hover:shadow-md transition-shadow">
+                <ImageIcon className="h-4 w-4" />
+                Insert Image
+                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              </label>
+            )}
+            {activeTab === "style" && (
+              <div className="flex gap-2">
+                {STYLES.map((s) => (
+                  <motion.button
+                    key={s.name}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => { setStyle(s); triggerSave(); }}
+                    className={`p-2.5 rounded-xl border transition-all flex flex-col items-center text-xs font-medium ${
+                      style.name === s.name
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm"
+                        : "border-gray-300 dark:border-gray-600 hover:border-indigo-400"
+                    }`}
+                  >
+                    <s.icon className="h-5 w-5 mb-1" />
+                    {s.name}
+                  </motion.button>
+                ))}
+              </div>
+            )}
+            <div className="ml-auto flex items-center gap-1">
+              <ToolButton disabled={!editor?.can().undo()} onClick={() => editor?.chain().focus().undo().run()}><Undo2 className="h-4 w-4" /></ToolButton>
+              <ToolButton disabled={!editor?.can().redo()} onClick={() => editor?.chain().focus().redo().run()}><Redo2 className="h-4 w-4" /></ToolButton>
+              <ToolButton onClick={() => setIsPreview(!isPreview)}>
+                {isPreview ? <Edit2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </ToolButton>
             </div>
-          )}
-
-          <div className="ml-auto flex gap-1">
-            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} onClick={() => editor?.chain().focus().undo().run()} disabled={!editor?.can().undo()} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700 disabled:opacity-50"><Undo2 className="h-4 w-4" /></motion.button>
-            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} onClick={() => editor?.chain().focus().redo().run()} disabled={!editor?.can().redo()} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700 disabled:opacity-50"><Redo2 className="h-4 w-4" /></motion.button>
-            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} onClick={() => setIsPreview(!isPreview)} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
-              {isPreview ? <Edit2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </motion.button>
           </div>
-        </div>
+        </>
+      )}
 
-        {/* SIDEBAR (LEFT) */}
-        <div className="fixed left-0 top-40 bottom-0 w-80 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 p-6 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Cover */}
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <div className="fixed left-0 top-16 w-80 h-full bg-gradient-to-b from-indigo-50/50 via-white to-purple-50/50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900/50 border-r border-gray-200/50 dark:border-gray-700/50 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Cover Upload */}
             <motion.div
               whileHover={{ scale: 1.02 }}
               className="relative group cursor-pointer rounded-2xl overflow-hidden shadow-lg"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => coverInputRef.current?.click()}
             >
-              <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600">
+              <div className="h-56 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600">
                 {coverImage ? (
                   <img src={coverImage} alt="cover" className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                    <Upload className="h-10 w-10 mb-2" />
+                    <Upload className="h-12 w-12 mb-3" />
                     <p className="text-sm font-medium">Upload Cover</p>
                   </div>
                 )}
               </div>
+              <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
             </motion.div>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
 
             {/* Chapters */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" /> Chapters
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                  <BookOpen className="h-5 w-5 text-indigo-600" /> Chapters
                 </h3>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
@@ -945,25 +921,21 @@ export default function StoryStudio() {
                   <Plus className="h-4 w-4" />
                 </motion.button>
               </div>
-
               {chapters.map((ch, ci) => {
                 const isOpen = openChapters.has(ch.id);
+                const isActive = activeChapterIdx === ci;
                 return (
                   <div key={ch.id} className="space-y-1">
                     <motion.div
                       layout
-                      className={`flex items-center gap-2 p-2 rounded-xl cursor-pointer transition-all ${
-                        activeChapterIdx === ci
-                          ? "bg-indigo-100 dark:bg-indigo-900/50"
+                      className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer transition-all ${
+                        isActive
+                          ? "bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50"
                           : "hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
-                      onClick={() => {
-                        setActiveChapterIdx(ci);
-                        setActivePageIdx(0);
-                        toggleChapter(ch.id);
-                      }}
+                      onClick={() => selectChapter(ci, ch.id)}
                     >
-                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {isOpen ? <ChevronDown className="h-4 w-4 text-indigo-600" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
                       <input
                         type="text"
                         value={ch.title}
@@ -974,9 +946,9 @@ export default function StoryStudio() {
                           triggerSave();
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex-1 bg-transparent outline-none font-medium text-sm"
+                        className="flex-1 bg-transparent outline-none font-medium text-sm text-gray-800 dark:text-gray-100"
                       />
-                      <span className="text-xs bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
                         {ch.pages.length}
                       </span>
                       <button
@@ -990,15 +962,25 @@ export default function StoryStudio() {
                       </button>
                     </motion.div>
 
+                    {/* Only show pages for active chapter */}
                     <AnimatePresence>
-                      {isOpen && (
+                      {isOpen && isActive && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
+                          animate={!isMobile ? { height: "auto", opacity: 1 } : {}}
                           exit={{ height: 0, opacity: 0 }}
-                          className="ml-6 space-y-1"
+                          className="ml-8 space-y-1"
                         >
-                          <Reorder.Group axis="y" values={ch.pages} onReorder={reorderPages}>
+                          <Reorder.Group
+                            axis="y"
+                            values={ch.pages}
+                            onReorder={(newOrder) => {
+                              setChapters((c) =>
+                                c.map((ch2, i) => (i === ci ? { ...ch2, pages: newOrder } : ch2))
+                              );
+                              triggerSave();
+                            }}
+                          >
                             {ch.pages.map((page, pi) => (
                               <Reorder.Item key={page.id} value={page}>
                                 <motion.div
@@ -1031,7 +1013,7 @@ export default function StoryStudio() {
                                       triggerSave();
                                     }}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex-1 bg-transparent outline-none text-sm"
+                                    className="flex-1 bg-transparent outline-none text-sm text-gray-700 dark:text-gray-300"
                                   />
                                   <button
                                     onClick={(e) => {
@@ -1046,7 +1028,6 @@ export default function StoryStudio() {
                               </Reorder.Item>
                             ))}
                           </Reorder.Group>
-
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -1066,45 +1047,309 @@ export default function StoryStudio() {
               })}
             </div>
 
-            {/* Publish */}
+            {/* Publish Button */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={publish}
               disabled={isPublishing}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
             >
               {isPublishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
               {isPublishing ? "Publishing…" : "Publish My Story"}
             </motion.button>
           </div>
         </div>
+      )}
 
-        {/* FULL SCREEN EDITOR PAGE (NO SCROLL) */}
-        <div
-          className="fixed left-80 right-0 top-40 bottom-0 bg-white shadow-2xl overflow-hidden"
-          style={{
-            width: "calc(100vw - 320px)",
-            height: "calc(100vh - 160px)",
-            padding: "2.5cm 2cm",
-            fontFamily: "Georgia, serif",
-            lineHeight: "1.7",
-          }}
-        >
-          {isPreview ? (
-            <div
-              className="prose prose-lg max-w-none h-full"
-              dangerouslySetInnerHTML={{
-                __html: currentChapter?.pages[activePageIdx]?.html || "",
-              }}
-            />
-          ) : (
-            <EditorContent
-              editor={editor}
-              className="h-full prose prose-lg max-w-none focus:outline-none"
-            />
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {isMobile && sidebarOpen && (
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl overflow-hidden"
+            style={{ maxHeight: "85vh" }}
+          >
+            <div className="flex justify-center pt-2">
+              <div className="w-16 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+            </div>
+            <div className="px-4 pb-4 overflow-y-auto" style={{ maxHeight: "calc(85vh - 2rem)" }}>
+              <div className="space-y-5 mt-4">
+                {/* Cover */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  className="relative group cursor-pointer rounded-2xl overflow-hidden shadow-lg"
+                  onClick={() => coverInputRef.current?.click()}
+                >
+                  <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                    {coverImage ? (
+                      <img src={coverImage} alt="cover" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                        <Upload className="h-10 w-10 mb-2" />
+                        <p className="text-sm font-medium">Upload Cover</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+                <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
+
+                {/* Chapters */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-indigo-600" /> Chapters
+                    </h3>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={addChapter}
+                      className="p-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </motion.button>
+                  </div>
+                  {chapters.map((ch, ci) => {
+                    const isOpen = openChapters.has(ch.id);
+                    const isActive = activeChapterIdx === ci;
+                    return (
+                      <div key={ch.id} className="space-y-1">
+                        <motion.div
+                          layout
+                          className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer transition-all ${
+                            isActive
+                              ? "bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50"
+                              : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                          }`}
+                          onClick={() => selectChapter(ci, ch.id)}
+                        >
+                          {isOpen ? <ChevronDown className="h-4 w-4 text-indigo-600" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+                          <input
+                            type="text"
+                            value={ch.title}
+                            onChange={(e) => {
+                              setChapters((c) =>
+                                c.map((c2, i) => (i === ci ? { ...c2, title: e.target.value } : c2))
+                              );
+                              triggerSave();
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1 bg-transparent outline-none font-medium text-sm"
+                          />
+                          <span className="text-xs bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                            {ch.pages.length}
+                          </span>
+                        </motion.div>
+                        <AnimatePresence>
+                          {isOpen && isActive && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="ml-6 space-y-1"
+                            >
+                              <Reorder.Group
+                                axis="y"
+                                values={ch.pages}
+                                onReorder={(newOrder) => {
+                                  setChapters((c) =>
+                                    c.map((ch2, i) => (i === ci ? { ...ch2, pages: newOrder } : ch2))
+                                  );
+                                  triggerSave();
+                                }}
+                              >
+                                {ch.pages.map((page, pi) => (
+                                  <Reorder.Item key={page.id} value={page}>
+                                    <motion.div
+                                      layout
+                                      whileHover={{ x: 4 }}
+                                      className={`flex items-center gap-2 p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all ${
+                                        activePageIdx === pi
+                                          ? "bg-emerald-100 dark:bg-emerald-900/40"
+                                          : "hover:bg-gray-50 dark:hover:bg-gray-600"
+                                      }`}
+                                      onClick={() => setActivePageIdx(pi)}
+                                    >
+                                      <GripVertical className="h-4 w-4 text-gray-400" />
+                                      <input
+                                        type="text"
+                                        value={page.title}
+                                        onChange={(e) => {
+                                          setChapters((c) =>
+                                            c.map((c2, i) =>
+                                              i === ci
+                                                ? {
+                                                    ...c2,
+                                                    pages: c2.pages.map((p, j) =>
+                                                      j === pi ? { ...p, title: e.target.value } : p
+                                                    ),
+                                                  }
+                                                : c2
+                                            )
+                                          );
+                                          triggerSave();
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="flex-1 bg-transparent outline-none text-sm"
+                                      />
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deletePage(pi);
+                                        }}
+                                        className="p-1 rounded-full opacity-0 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </motion.div>
+                                  </Reorder.Item>
+                                ))}
+                              </Reorder.Group>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addPage();
+                                }}
+                                className="w-full py-1.5 text-xs text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-1"
+                              >
+                                <Plus className="h-3 w-3" /> Add page
+                              </motion.button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={publish}
+                  disabled={isPublishing}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
+                >
+                  {isPublishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                  {isPublishing ? "Publishing…" : "Publish My Story"}
+                </motion.button>
+              </div>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="absolute top-3 right-4 p-2 rounded-full bg-gray-100 dark:bg-gray-700"
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Bottom Nav */}
+      {isMobile && (
+        <>
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50">
+            <div className="flex items-center justify-around py-2">
+              {(["home", "insert", "style"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg transition text-xs ${
+                    activeTab === tab ? "text-indigo-600 dark:text-indigo-400" : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {tab === "home" && "Format"}
+                  {tab === "insert" && "Insert"}
+                  {tab === "style" && "Style"}
+                </button>
+              ))}
+              <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center gap-1 p-2 rounded-lg text-gray-500 dark:text-gray-400 text-xs">
+                <GripVertical className="h-5 w-5" />
+                Pages
+              </button>
+              <button onClick={() => setIsPreview(!isPreview)} className="flex flex-col items-center gap-1 p-2 rounded-lg text-gray-500 dark:text-gray-400 text-xs">
+                {isPreview ? <Edit2 className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {isPreview ? "Edit" : "View"}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Toolbars */}
+          {activeTab === "home" && (
+            <div className="fixed bottom-16 left-0 right-0 z-40 flex items-center justify-center gap-1.5 p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 overflow-x-auto">
+              <ToolButton active={editor?.isActive("bold")} onClick={() => editor?.chain().focus().toggleBold().run()}><BoldIcon className="h-4 w-4" /></ToolButton>
+              <ToolButton active={editor?.isActive("italic")} onClick={() => editor?.chain().focus().toggleItalic().run()}><ItalicIcon className="h-4 w-4" /></ToolButton>
+              <ToolButton active={editor?.isActive("strike")} onClick={() => editor?.chain().focus().toggleStrike().run()}><Strikethrough className="h-4 w-4" /></ToolButton>
+              <ToolButton active={editor?.isActive("highlight")} onClick={() => editor?.chain().focus().toggleHighlight().run()}><Highlighter className="h-4 w-4" /></ToolButton>
+              <Divider />
+              <ToolButton active={editor?.isActive("heading", { level: 1 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}><Heading1 className="h-4 w-4" /></ToolButton>
+              <ToolButton active={editor?.isActive("heading", { level: 2 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 className="h-4 w-4" /></ToolButton>
+              <Divider />
+              <ToolButton active={editor?.isActive("bulletList")} onClick={() => editor?.chain().focus().toggleBulletList().run()}><List className="h-4 w-4" /></ToolButton>
+              <ToolButton active={editor?.isActive("orderedList")} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-4 w-4" /></ToolButton>
+              <div className="ml-auto flex gap-1">
+                <ToolButton disabled={!editor?.can().undo()} onClick={() => editor?.chain().focus().undo().run()}><Undo2 className="h-4 w-4" /></ToolButton>
+                <ToolButton disabled={!editor?.can().redo()} onClick={() => editor?.chain().focus().redo().run()}><Redo2 className="h-4 w-4" /></ToolButton>
+              </div>
+            </div>
           )}
-        </div>
+          {activeTab === "insert" && (
+            <div className="fixed bottom-16 left-0 right-0 z-40 flex items-center justify-center p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50">
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium cursor-pointer hover:shadow-md transition-shadow">
+                <ImageIcon className="h-4 w-4" />
+                Insert Image
+                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              </label>
+            </div>
+          )}
+          {activeTab === "style" && (
+            <div className="fixed bottom-16 left-0 right-0 z-40 flex gap-2 p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 overflow-x-auto">
+              {STYLES.map((s) => (
+                <motion.button
+                  key={s.name}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => { setStyle(s); triggerSave(); }}
+                  className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center text-xs font-medium ${
+                    style.name === s.name
+                      ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-md"
+                      : "border-gray-200 dark:border-gray-700 hover:border-indigo-300"
+                  }`}
+                >
+                  <s.icon className="h-6 w-6 mb-1 text-indigo-600" />
+                  {s.name}
+                </motion.button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* MAIN EDITOR AREA */}
+      <div
+        className={`${
+          isMobile
+            ? "fixed left-0 right-0 top-16 bottom-16"
+            : "fixed left-80 right-0 top-40 bottom-0"
+        } bg-white dark:bg-gray-50 overflow-auto`}
+      >
+        {isPreview ? (
+          <div
+            className="prose prose-lg max-w-none p-8"
+            dangerouslySetInnerHTML={{
+              __html: currentChapter?.pages[activePageIdx]?.html || "",
+            }}
+          />
+        ) : (
+          <EditorContent
+            editor={editor}
+            className="h-full w-full"
+          />
+        )}
       </div>
     </>
   );
