@@ -1,20 +1,16 @@
-"use client";
-
-import { useEffect, useRef } from "react";
+// app/layout.tsx
+import "./globals.css";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import "./globals.css";
 import Header from "./components/Header";
-import BioHostLogo from "./asset/jobloggo.jpg"; // Renamed from jobloggo.jpg
+import BioHostLogo from "@/asset/jobloggo.jpg";
+import { useEffect, useRef } from "react";
 
-// Type for RootLayout props
-type RootLayoutProps = {
-  children: React.ReactNode;
-};
-
-// Network detection using useTheme
+// ——————————————————————
+// Network Status Component
+// ——————————————————————
 function NetworkStatus() {
   const { theme } = useTheme();
   const offlineToastId = useRef<string | number | null>(null);
@@ -61,8 +57,10 @@ function NetworkStatus() {
   return null;
 }
 
-// AppContent uses useTheme for dynamic class
-function AppContent({ children }: RootLayoutProps) {
+// ——————————————————————
+// App Content with Theme
+// ——————————————————————
+function AppContent({ children }: { children: React.ReactNode }) {
   const { theme } = useTheme();
 
   const themeClass =
@@ -86,10 +84,8 @@ function AppContent({ children }: RootLayoutProps) {
       />
 
       <NetworkStatus />
-
       <Header />
 
-      {/* No padding — content takes full width */}
       <main className="mx-auto max-w-7xl" role="main">
         {children}
       </main>
@@ -105,12 +101,14 @@ function AppContent({ children }: RootLayoutProps) {
   );
 }
 
-// FINAL RootLayout: Wraps Providers correctly
-export default function RootLayout({ children }: RootLayoutProps) {
+// ——————————————————————
+// Root Layout (App Router)
+// ——————————————————————
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="scroll-smooth antialiased">
       <head>
-        {/* Primary Meta Tags */}
+        <meta charSet="utf-8" />
         <title>BioHost – Create, Host & Share Your Life Story Online</title>
         <meta
           name="description"
@@ -120,38 +118,27 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <meta name="theme-color" content="#6366f1" />
 
         {/* Favicon */}
-        <link rel="icon" type="image/png" sizes="32x32" href={BioHostLogo.src} />
-        <link rel="icon" type="image/png" sizes="16x16" href={BioHostLogo.src} />
-        <link rel="apple-touch-icon" sizes="180x180" href={BioHostLogo.src} />
+        <link rel="icon" href={BioHostLogo.src} />
+        <link rel="apple-touch-icon" href={BioHostLogo.src} />
         <link rel="manifest" href="/manifest.json" />
 
-        {/* Open Graph / Social Sharing */}
+        {/* Open Graph */}
         <meta property="og:title" content="BioHost – Your Life Story, Beautifully Hosted" />
         <meta
           property="og:description"
           content="Create, customize, and securely host your biography. Share your legacy with family, friends, and the world."
         />
         <meta property="og:image" content={BioHostLogo.src} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
         <meta property="og:url" content="https://biohost.com" />
         <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="BioHost" />
 
-        {/* Twitter Card */}
+        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="BioHost – Host Your Life Story Online" />
-        <meta
-          name="twitter:description"
-          content="Professional biographies with secure hosting, customization, and easy sharing."
-        />
         <meta name="twitter:image" content={BioHostLogo.src} />
-
-        {/* Canonical */}
-        <link rel="canonical" href="https://biohost.com" />
       </head>
 
-      <body className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 transition-all duration-500">
+      <body>
         <ThemeProvider>
           <AuthProvider>
             <AppContent>{children}</AppContent>
