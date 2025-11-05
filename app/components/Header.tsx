@@ -110,7 +110,7 @@ export default function Header() {
                 >
                   <Link
                     href={item.href}
-                    className="font-medium text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-yellow-400 transition-all duration-300 relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-blue-600 after:to-teal-500 dark:after:from-yellow-400 dark:after:to-orange-500 after:transition-all after:duration-300 hover:after:w-full"
+                    className="font-medium text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-yellow-400 transition-all duration-300 relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-linear-to-r after:from-blue-600 after:to-teal-500 dark:after:from-yellow-400 dark:after:to-orange-500 after:transition-all after:duration-300 hover:after:w-full"
                   >
                     {item.name}
                   </Link>

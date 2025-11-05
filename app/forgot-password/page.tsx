@@ -4,15 +4,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Mail,
   Lock,
-  Eye,
-  EyeOff,
+  
   Loader2,
   CheckCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import zxcvbn from "zxcvbn";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
