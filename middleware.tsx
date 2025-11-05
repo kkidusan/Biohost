@@ -10,7 +10,6 @@ const VALID_STATIC_ROUTES = [
   "/login",
   "/signup",
   "/forgot-password",
-  "/workers",
   "/notfound", // This MUST be here
     "/read",
   "/reset-password",
@@ -26,7 +25,7 @@ const VALID_STATIC_ROUTES = [
 ];
 
 // === 2. Protected routes (require auth) ===
-const PROTECTED_ROUTES = ["/dashboard", "/account", "/orders"];
+const PROTECTED_ROUTES = ["/story", "/profile"];
 
 // === 3. Dynamic route patterns (allowed without auth) ===
 const DYNAMIC_ROUTE_PATTERNS = [

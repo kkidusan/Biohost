@@ -1,11 +1,14 @@
 // app/layout.tsx
+"use client"
+
+
 import "./globals.css";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Header from "./components/Header";
-import BioHostLogo from "@/asset/jobloggo.jpg";
+import BioHostLogo from "./asset/jobloggo.jpg";
 import { useEffect, useRef } from "react";
 
 // ——————————————————————
