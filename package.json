@@ -65,7 +65,6 @@
     "react-swipeable": "^7.0.2",
     "react-toastify": "^11.0.5",
     "recharts": "^2.10.4",
-    "tiptap-extension-background-color": "^1.0.0",
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
