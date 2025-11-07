@@ -2,79 +2,166 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, CheckCircle, MessageCircle, BookOpen, Trash2, Eye } from "lucide-react";
+import {
+  Bell,
+  CheckCircle,
+  MessageCircle,
+  BookOpen,
+  Trash2,
+  Eye,
+  Globe,
+  GlobeLock,
+} from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "../context/AuthContext";
+import { db } from "../firebaseconfig";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  writeBatch,
+} from "firebase/firestore";
+import { toast } from "react-hot-toast";
+
+interface Chapter {
+  id: string;
+  title: string;
+  publish: boolean;
+  isRead: number;
+}
+
+interface Book {
+  id: string;
+  title: string;
+  chapters: Chapter[];
+}
 
 interface Notification {
   id: string;
-  title: string;
-  description: string;
-  type: "info" | "success" | "warning";
+  bookId: string;
+  chapterId: string;
+  chapterTitle: string;
+  bookTitle: string;
+  type: "published" | "read_update";
+  message: string;
+  timestamp: Date;
   read: boolean;
-  timestamp: string;
-  action?: { label: string; href: string };
 }
 
 export default function NotificationsPage() {
+  const { user, isLoggedIn } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotifications = async () => {
+    if (!user?.email) return;
+    setLoading(true);
+
+    try {
+      // 1. Get all user's books
+      const booksQuery = query(
+        collection(db, "books"),
+        where("authorEmail", "==", user.email)
+      );
+      const booksSnap = await getDocs(booksQuery);
+      const books: Book[] = booksSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Book[];
+
+      // 2. Generate notifications from publish status & reads
+      const notifs: Notification[] = [];
+      const now = new Date();
+
+      books.forEach((book) => {
+        book.chapters.forEach((chapter) => {
+          const chapterDocRef = doc(db, "books", book.id);
+
+          // Published notification
+          if (chapter.publish) {
+            notifs.push({
+              id: `${book.id}_${chapter.id}_published`,
+              bookId: book.id,
+              chapterId: chapter.id,
+              bookTitle: book.title,
+              chapterTitle: chapter.title,
+              type: "published",
+              message: `Chapter "${chapter.title}" is now live!`,
+              timestamp: now,
+              read: false,
+            });
+          }
+
+          // Read count update (only if > 0)
+          if (chapter.isRead > 0) {
+            notifs.push({
+              id: `${book.id}_${chapter.id}_reads_${chapter.isRead}`,
+              bookId: book.id,
+              chapterId: chapter.id,
+              bookTitle: book.title,
+              chapterTitle: chapter.title,
+              type: "read_update",
+              message: `Your chapter has been read ${chapter.isRead} time${chapter.isRead > 1 ? "s" : ""}`,
+              timestamp: now,
+              read: false,
+            });
+          }
+        });
+      });
+
+      // Sort by timestamp desc
+      notifs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      setNotifications(notifs);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load notifications");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulate fetching notifications (replace with API)
-    const sampleNotifications: Notification[] = [
-      {
-        id: "1",
-        title: "New Story Published",
-        description: "Your story 'Bio Adventures' is now live!",
-        type: "success",
-        read: false,
-        timestamp: "2 min ago",
-        action: { label: "View Story", href: "/story" },
-      },
-      {
-        id: "2",
-        title: "Welcome to BioHost",
-        description: "Get started with our quick tour.",
-        type: "info",
-        read: true,
-        timestamp: "1 day ago",
-      },
-      {
-        id: "3",
-        title: "New Follower",
-        description: "John Doe started following you.",
-        type: "info",
-        read: false,
-        timestamp: "3 hours ago",
-        action: { label: "View Profile", href: "/profile/john-doe" },
-      },
-      {
-        id: "4",
-        title: "Comment on Your Post",
-        description: "Someone commented on your recent bio update.",
-        type: "warning",
-        read: true,
-        timestamp: "5 days ago",
-        action: { label: "View Comment", href: "/story/123/comments" },
-      },
-    ];
-    setNotifications(sampleNotifications);
-  }, []);
+    if (isLoggedIn) fetchNotifications();
+  }, [isLoggedIn, user?.email]);
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
     setNotifications((prev) =>
-      prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif))
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((notif) => notif.id !== id));
+  const deleteNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    toast.success("Notification removed");
   };
 
-  const filteredNotifications = filter === "unread" ? notifications.filter((n) => !n.read) : notifications;
+  const markAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    toast.success("All marked as read");
+  };
+
+  const filteredNotifications = filter === "unread"
+    ? notifications.filter((n) => !n.read)
+    : notifications;
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-600">
+        Please log in to view notifications
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-indigo-900 dark:to-purple-900 py-8">
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
         <motion.div
@@ -82,50 +169,76 @@ export default function NotificationsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-2">
-            <Bell className="h-8 w-8 text-blue-600 dark:text-yellow-400" />
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-3">
+            <Bell className="h-10 w-10 text-indigo-600 dark:text-purple-400" />
             Notifications
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            {filteredNotifications.length} {filter === "unread" ? "unread" : "total"} notifications
+          <p className="text-lg text-gray-600 dark:text-gray-400">
+            {unreadCount > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 bg-red-500 rounded-full animate-pulse"></span>
+                {unreadCount} unread
+              </span>
+            )}
+            {unreadCount === 0 && "You're all caught up!"}
           </p>
         </motion.div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6">
+        {/* Actions Bar */}
+        <div className="flex gap-3 mb-6">
           <button
             onClick={() => setFilter("all")}
-            className={`flex-1 py-2 px-4 rounded-xl font-medium transition-all ${
+            className={`flex-1 py-3 px-6 rounded-2xl font-semibold transition-all shadow-sm ${
               filter === "all"
-                ? "bg-blue-600 text-white shadow-sm"
-                : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                ? "bg-indigo-600 text-white"
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
             }`}
           >
-            All
+            All ({notifications.length})
           </button>
           <button
             onClick={() => setFilter("unread")}
-            className={`flex-1 py-2 px-4 rounded-xl font-medium transition-all ${
+            className={`flex-1 py-3 px-6 rounded-2xl font-semibold transition-all shadow-sm ${
               filter === "unread"
-                ? "bg-blue-600 text-white shadow-sm"
-                : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                ? "bg-indigo-600 text-white"
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
             }`}
           >
-            Unread
+            Unread ({unreadCount})
           </button>
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="px-4 py-3 bg-emerald-600 text-white rounded-2xl font-medium hover:bg-emerald-700 transition"
+            >
+              <CheckCircle className="h-5 w-5" />
+            </button>
+          )}
         </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="text-center py-20">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
+          </div>
+        )}
 
         {/* Empty State */}
         <AnimatePresence>
-          {filteredNotifications.length === 0 && (
+          {!loading && filteredNotifications.length === 0 && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-12"
+              exit={{ opacity: 0 }}
+              className="text-center py-20"
             >
-              <Bell className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No notifications</h3>
-              <p className="text-gray-500 dark:text-gray-400">You're all caught up!</p>
+              <Bell className="mx-auto h-20 w-20 text-gray-300 dark:text-gray-700 mb-6" />
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                No notifications yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Publish a chapter to get started!
+              </p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -133,64 +246,83 @@ export default function NotificationsPage() {
         {/* Notifications List */}
         <ul className="space-y-4">
           <AnimatePresence>
-            {filteredNotifications.map((notification) => (
+            {filteredNotifications.map((notif, idx) => (
               <motion.li
-                key={notification.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="bg-white dark:bg-gray-800/95 rounded-2xl p-4 shadow-sm border border-gray-200/50 dark:border-gray-700/50"
+                key={notif.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -100 }}
+                transition={{ delay: idx * 0.05 }}
+                className={`bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-lg border ${
+                  !notif.read
+                    ? "border-indigo-300 dark:border-purple-600 ring-2 ring-indigo-200 dark:ring-purple-800/30"
+                    : "border-gray-200 dark:border-gray-700"
+                }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-4">
                   {/* Icon */}
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                    notification.type === "success" ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" :
-                    notification.type === "warning" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400" :
-                    "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                  }`}>
-                    {notification.type === "success" && <CheckCircle className="h-5 w-5" />}
-                    {notification.type === "info" && <MessageCircle className="h-5 w-5" />}
-                    {notification.type === "warning" && <BookOpen className="h-5 w-5" />}
+                  <div
+                    className={`flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center ${
+                      notif.type === "published"
+                        ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400"
+                        : "bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400"
+                    }`}
+                  >
+                    {notif.type === "published" ? (
+                      <Globe className="h-6 w-6" />
+                    ) : (
+                      <Eye className="h-6 w-6" />
+                    )}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className={`font-semibold text-sm ${
-                          !notification.read ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400"
-                        }`}>
-                          {notification.title}
+                        <h3 className={`font-bold text-lg ${!notif.read ? "text-indigo-600 dark:text-purple-400" : "text-gray-900 dark:text-gray-100"}`}>
+                          {notif.type === "published" ? "Chapter Published!" : "Readers Are Loving It!"}
                         </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{notification.description}</p>
+                        <p className="text-gray-700 dark:text-gray-300 mt-1 font-medium">
+                          {notif.message}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2 text-sm">
+                          <span className="text-gray-500 dark:text-gray-400">in</span>
+                          <Link
+                            href={`/story-studio/${notif.bookId}`}
+                            className="font-semibold text-indigo-600 dark:text-purple-400 hover:underline"
+                          >
+                            {notif.bookTitle}
+                          </Link>
+                          <span className="text-gray-500 dark:text-gray-400">→</span>
+                          <span className="font-medium truncate max-w-[180px]">
+                            {notif.chapterTitle}
+                          </span>
+                        </div>
                       </div>
-                      {!notification.read && (
-                        <button
-                          onClick={() => markAsRead(notification.id)}
-                          className="ml-2 flex-shrink-0"
-                        >
-                          <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">{notification.timestamp}</p>
-                    {notification.action && (
-                      <Link
-                        href={notification.action.href}
-                        className="inline-block mt-2 text-xs font-medium text-blue-600 dark:text-yellow-400 hover:underline"
-                      >
-                        {notification.action.label}
-                      </Link>
-                    )}
-                  </div>
 
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => deleteNotification(notification.id)}
-                    className="ml-2 flex-shrink-0 p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                      {/* Actions */}
+                      <div className="flex items-center gap-2">
+                        {!notif.read && (
+                          <button
+                            onClick={() => markAsRead(notif.id)}
+                            className="p-2 rounded-xl bg-indigo-100 dark:bg-purple-900/50 hover:bg-indigo-200 dark:hover:bg-purple-800 transition"
+                          >
+                            <CheckCircle className="h-5 w-5 text-indigo-600 dark:text-purple-400" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteNotification(notif.id)}
+                          className="p-2 rounded-xl bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800 transition"
+                        >
+                          <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">
+                      {notif.timestamp.toLocaleTimeString()} • {notif.timestamp.toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
               </motion.li>
             ))}
@@ -198,12 +330,12 @@ export default function NotificationsPage() {
         </ul>
 
         {/* Back Link */}
-        <div className="mt-8 text-center">
+        <div className="mt-12 text-center">
           <Link
-            href="/profile"
-            className="inline-flex items-center gap-2 text-blue-600 dark:text-yellow-400 hover:underline text-sm"
+            href="/story"
+            className="inline-flex items-center gap-2 text-indigo-600 dark:text-purple-400 hover:underline text-lg font-medium"
           >
-            ← Back to Profile
+            ← Back to My Stories
           </Link>
         </div>
       </div>

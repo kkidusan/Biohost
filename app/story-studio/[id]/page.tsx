@@ -282,12 +282,20 @@ export default function EditorPage() {
     }
   }, [theme]);
 
+  // FIXED: Guard against undefined pages + safer loading
   const totalWords = useMemo(() => {
     return chapters.reduce((acc: number, ch: Chapter) => {
-      return acc + ch.pages.reduce((pacc: number, p: Page) => {
-        const txt = p.content?.content?.map((n: any) => (n.type === "text" ? n.text : "")).join(" ") || "";
-        return pacc + txt.split(/\s+/).filter(Boolean).length;
-      }, 0);
+      const pages = ch.pages ?? [];
+      return (
+        acc +
+        pages.reduce((pacc: number, p: Page) => {
+          const txt =
+            p.content?.content
+              ?.map((n: any) => (n.type === "text" ? n.text : ""))
+              .join(" ") || "";
+          return pacc + txt.split(/\s+/).filter(Boolean).length;
+        }, 0)
+      );
     }, 0);
   }, [chapters]);
 
@@ -319,7 +327,11 @@ export default function EditorPage() {
         setBookTitle(data.title || "My Life Story");
         setCoverImage(data.coverImage || "");
         const loadedChapters = data.chapters?.length 
-          ? data.chapters.map((ch: any) => ({ ...ch, publish: ch.publish ?? false }))
+          ? data.chapters.map((ch: any) => ({ 
+              ...ch, 
+              pages: ch.pages ?? [],
+              publish: ch.publish ?? false 
+            }))
           : [defaultChapter];
         setChapters(loadedChapters);
         setStyle(STYLES.find((s: WritingStyle) => s.name === data.style) || STYLES[0]);
@@ -636,13 +648,83 @@ export default function EditorPage() {
         active
           ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
           : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+      } ${disabled ? "opacity-40 cursor not-allowed" : ""}`}
     >
       {children}
     </motion.button>
   );
 
   const Divider = () => <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />;
+
+  // ────── TOOLBAR CONTENT (shared between desktop & mobile) ──────
+  const ToolbarContent = () => (
+    <>
+      {activeTab === "home" && (
+        <>
+          <div className="flex items-center gap-1">
+            <ToolButton active={editor?.isActive("bold")} onClick={() => editor?.chain().focus().toggleBold().run()}><BoldIcon className="h-4 w-4" /></ToolButton>
+            <ToolButton active={editor?.isActive("italic")} onClick={() => editor?.chain().focus().toggleItalic().run()}><ItalicIcon className="h-4 w-4" /></ToolButton>
+            <ToolButton active={editor?.isActive("strike")} onClick={() => editor?.chain().focus().toggleStrike().run()}><Strikethrough className="h-4 w-4" /></ToolButton>
+          </div>
+          <Divider />
+          <div className="flex items-center gap-1">
+            <ToolButton active={editor?.isActive("heading", { level: 1 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}><Heading1 className="h-4 w-4" /></ToolButton>
+            <ToolButton active={editor?.isActive("heading", { level: 2 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 className="h-4 w-4" /></ToolButton>
+          </div>
+          <Divider />
+          <div className="flex items-center gap-1">
+            <ToolButton active={editor?.isActive("bulletList")} onClick={() => editor?.chain().focus().toggleBulletList().run()}><List className="h-4 w-4" /></ToolButton>
+            <ToolButton active={editor?.isActive("orderedList")} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-4 w-4" /></ToolButton>
+          </div>
+          <Divider />
+          <div className="flex items-center gap-1">
+            <ToolButton active={editor?.isActive({ textAlign: "left" })} onClick={() => editor?.chain().focus().setTextAlign("left").run()}><AlignLeft className="h-4 w-4" /></ToolButton>
+            <ToolButton active={editor?.isActive({ textAlign: "center" })} onClick={() => editor?.chain().focus().setTextAlign("center").run()}><AlignCenter className="h-4 w-4" /></ToolButton>
+            <ToolButton active={editor?.isActive({ textAlign: "right" })} onClick={() => editor?.chain().focus().setTextAlign("right").run()}><AlignRight className="h-4 w-4" /></ToolButton>
+            <ToolButton active={editor?.isActive({ textAlign: "justify" })} onClick={() => editor?.chain().focus().setTextAlign("justify").run()}><AlignJustify className="h-4 w-4" /></ToolButton>
+          </div>
+          <Divider />
+          <ToolButton onClick={() => setShowColorPicker(true)}><Droplet className="h-4 w-4" /></ToolButton>
+          <ToolButton onClick={() => setShowFontPicker(true)}><Type className="h-4 w-4" /></ToolButton>
+          <ToolButton onClick={() => setShowLineHeightPicker(true)}><Baseline className="h-4 w-4" /></ToolButton>
+        </>
+      )}
+      {activeTab === "insert" && (
+        <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium cursor-pointer hover:shadow-md transition-shadow">
+          <ImageIcon className="h-4 w-4" />
+          Insert Image
+          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        </label>
+      )}
+      {activeTab === "style" && (
+        <div className="flex gap-2 items-center">
+          {STYLES.map((s: WritingStyle) => (
+            <motion.button
+              key={s.name}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => { setStyle(s); triggerSave(); }}
+              className={`p-2.5 rounded-xl border transition-all flex flex-col items-center text-xs font-medium ${
+                style.name === s.name
+                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm"
+                  : "border-gray-300 dark:border-gray-600 hover:border-indigo-400"
+              }`}
+            >
+              <s.icon className="h-5 w-5 mb-1" />
+              {s.name}
+            </motion.button>
+          ))}
+        </div>
+      )}
+      <div className="ml-auto flex items-center gap-1">
+        <ToolButton disabled={!editor?.can().undo()} onClick={() => editor?.chain().focus().undo().run()}><Undo2 className="h-4 w-4" /></ToolButton>
+        <ToolButton disabled={!editor?.can().redo()} onClick={() => editor?.chain().focus().redo().run()}><Redo2 className="h-4 w-4" /></ToolButton>
+        <ToolButton onClick={() => setIsPreview(!isPreview)}>
+          {isPreview ? <Edit2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </ToolButton>
+      </div>
+    </>
+  );
 
   // ────── VERTICAL POPOVERS (CARD STYLE) ──────
   const VerticalPopover = ({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) => (
@@ -810,77 +892,15 @@ export default function EditorPage() {
             ))}
           </div>
           <div className="fixed top-28 left-80 right-0 z-30 flex items-center gap-1.5 p-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30 overflow-x-auto">
-            {activeTab === "home" && (
-              <>
-                <div className="flex items-center gap-1">
-                  <ToolButton active={editor?.isActive("bold")} onClick={() => editor?.chain().focus().toggleBold().run()}><BoldIcon className="h-4 w-4" /></ToolButton>
-                  <ToolButton active={editor?.isActive("italic")} onClick={() => editor?.chain().focus().toggleItalic().run()}><ItalicIcon className="h-4 w-4" /></ToolButton>
-                  <ToolButton active={editor?.isActive("strike")} onClick={() => editor?.chain().focus().toggleStrike().run()}><Strikethrough className="h-4 w-4" /></ToolButton>
-                </div>
-                <Divider />
-                <div className="flex items-center gap-1">
-                  <ToolButton active={editor?.isActive("heading", { level: 1 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}><Heading1 className="h-4 w-4" /></ToolButton>
-                  <ToolButton active={editor?.isActive("heading", { level: 2 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 className="h-4 w-4" /></ToolButton>
-                </div>
-                <Divider />
-                <div className="flex items-center gap-1">
-                  <ToolButton active={editor?.isActive("bulletList")} onClick={() => editor?.chain().focus().toggleBulletList().run()}><List className="h-4 w-4" /></ToolButton>
-                  <ToolButton active={editor?.isActive("orderedList")} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-4 w-4" /></ToolButton>
-                </div>
-                <Divider />
-                <div className="flex items-center gap-1">
-                  <ToolButton active={editor?.isActive({ textAlign: "left" })} onClick={() => editor?.chain().focus().setTextAlign("left").run()}><AlignLeft className="h-4 w-4" /></ToolButton>
-                  <ToolButton active={editor?.isActive({ textAlign: "center" })} onClick={() => editor?.chain().focus().setTextAlign("center").run()}><AlignCenter className="h-4 w-4" /></ToolButton>
-                  <ToolButton active={editor?.isActive({ textAlign: "right" })} onClick={() => editor?.chain().focus().setTextAlign("right").run()}><AlignRight className="h-4 w-4" /></ToolButton>
-                  <ToolButton active={editor?.isActive({ textAlign: "justify" })} onClick={() => editor?.chain().focus().setTextAlign("justify").run()}><AlignJustify className="h-4 w-4" /></ToolButton>
-                </div>
-                <Divider />
-                <ToolButton onClick={() => setShowColorPicker(true)}><Droplet className="h-4 w-4" /></ToolButton>
-                <ToolButton onClick={() => setShowFontPicker(true)}><Type className="h-4 w-4" /></ToolButton>
-                <ToolButton onClick={() => setShowLineHeightPicker(true)}><Baseline className="h-4 w-4" /></ToolButton>
-              </>
-            )}
-            {activeTab === "insert" && (
-              <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium cursor-pointer hover:shadow-md transition-shadow">
-                <ImageIcon className="h-4 w-4" />
-                Insert Image
-                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-              </label>
-            )}
-            {activeTab === "style" && (
-              <div className="flex gap-2 items-center">
-                {STYLES.map((s: WritingStyle) => (
-                  <motion.button
-                    key={s.name}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => { setStyle(s); triggerSave(); }}
-                    className={`p-2.5 rounded-xl border transition-all flex flex-col items-center text-xs font-medium ${
-                      style.name === s.name
-                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm"
-                        : "border-gray-300 dark:border-gray-600 hover:border-indigo-400"
-                    }`}
-                  >
-                    <s.icon className="h-5 w-5 mb-1" />
-                    {s.name}
-                  </motion.button>
-                ))}
-              </div>
-            )}
-            <div className="ml-auto flex items-center gap-1">
-              <ToolButton disabled={!editor?.can().undo()} onClick={() => editor?.chain().focus().undo().run()}><Undo2 className="h-4 w-4" /></ToolButton>
-              <ToolButton disabled={!editor?.can().redo()} onClick={() => editor?.chain().focus().redo().run()}><Redo2 className="h-4 w-4" /></ToolButton>
-              <ToolButton onClick={() => setIsPreview(!isPreview)}>
-                {isPreview ? <Edit2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </ToolButton>
-            </div>
+            <ToolbarContent />
           </div>
         </>
       )}
 
-      {/* MOBILE BOTTOM NAV & TOOLBAR */}
+      {/* MOBILE BOTTOM NAV & TOOLBAR (FIXED: now renders real tools) */}
       {isMobile && (
         <>
+          {/* Bottom navigation tabs */}
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50">
             <div className="flex items-center justify-around py-2">
               <button onClick={() => setActiveTab("home")} className={`p-3 rounded-xl flex flex-col items-center gap-1 ${activeTab === "home" ? "text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30" : "text-gray-500"}`}>
@@ -906,9 +926,10 @@ export default function EditorPage() {
             </div>
           </div>
 
-          <div className="fixed bottom-20 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t border-gray-200/30 dark:border-gray-700/30">
-            <div className="overflow-x-auto whitespace-nowrap p-2 scrollbar-hide">
-              {/* Same toolbar content as desktop */}
+          {/* Mobile floating toolbar - now shows ACTUAL tools */}
+          <div className="fixed bottom-20 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t border-gray-200/30 dark:border-gray-700/30 shadow-lg">
+            <div className="flex items-center gap-1.5 p-3 overflow-x-auto scrollbar-hide">
+              <ToolbarContent />
             </div>
           </div>
         </>
@@ -916,6 +937,7 @@ export default function EditorPage() {
 
       {/* SIDEBAR */}
       <div ref={sidebarRef} className={`fixed top-16 left-0 h-full w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-40 transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 overflow-y-auto`}>
+        {/* ... sidebar content unchanged ... */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-inherit z-10">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Outline</h2>
