@@ -1,30 +1,26 @@
+// components/NotificationsPage.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import {
   Bell,
   CheckCircle,
-  MessageCircle,
-  BookOpen,
   Trash2,
   Eye,
   Globe,
-  GlobeLock,
+  ArrowLeft,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext"; // Added for theme-aware gradients
 import { db } from "../firebaseconfig";
 import {
   collection,
   query,
   where,
   getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  writeBatch,
 } from "firebase/firestore";
 import { toast } from "react-hot-toast";
 
@@ -55,6 +51,7 @@ interface Notification {
 
 export default function NotificationsPage() {
   const { user, isLoggedIn } = useAuth();
+  const { theme } = useTheme(); // For dynamic gradients
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [loading, setLoading] = useState(true);
@@ -64,7 +61,6 @@ export default function NotificationsPage() {
     setLoading(true);
 
     try {
-      // 1. Get all user's books
       const booksQuery = query(
         collection(db, "books"),
         where("authorEmail", "==", user.email)
@@ -75,15 +71,11 @@ export default function NotificationsPage() {
         ...d.data(),
       })) as Book[];
 
-      // 2. Generate notifications from publish status & reads
       const notifs: Notification[] = [];
       const now = new Date();
 
       books.forEach((book) => {
         book.chapters.forEach((chapter) => {
-          const chapterDocRef = doc(db, "books", book.id);
-
-          // Published notification
           if (chapter.publish) {
             notifs.push({
               id: `${book.id}_${chapter.id}_published`,
@@ -98,7 +90,6 @@ export default function NotificationsPage() {
             });
           }
 
-          // Read count update (only if > 0)
           if (chapter.isRead > 0) {
             notifs.push({
               id: `${book.id}_${chapter.id}_reads_${chapter.isRead}`,
@@ -115,7 +106,6 @@ export default function NotificationsPage() {
         });
       });
 
-      // Sort by timestamp desc
       notifs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       setNotifications(notifs);
     } catch (err) {
@@ -130,18 +120,18 @@ export default function NotificationsPage() {
     if (isLoggedIn) fetchNotifications();
   }, [isLoggedIn, user?.email]);
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
   };
 
-  const deleteNotification = async (id: string) => {
+  const deleteNotification = (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     toast.success("Notification removed");
   };
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     toast.success("All marked as read");
   };
@@ -154,73 +144,103 @@ export default function NotificationsPage() {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-gray-600">
-        Please log in to view notifications
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-black text-gray-700 dark:text-gray-300">
+        <p className="text-xl font-medium">Please log in to view notifications</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-indigo-900 dark:to-purple-900 py-8">
-      <div className="max-w-2xl mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-pink-600/10 dark:from-blue-500/5 dark:via-purple-500/5 dark:to-pink-500/5">
+      {/* Animated Background Blobs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{ x: [0, 120, 0], y: [0, -80, 0] }}
+          transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+          className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-purple-500/20 rounded-full blur-3xl"
+        />
+        <motion.div
+          animate={{ x: [0, -100, 0], y: [0, 100, 0] }}
+          transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-tr from-pink-400/20 to-orange-500/20 rounded-full blur-3xl"
+        />
+      </div>
+
+      <div className="relative max-w-3xl mx-auto px-4 py-12">
         {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          transition={{ duration: 0.7 }}
+          className="text-center mb-10"
         >
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-3">
-            <Bell className="h-10 w-10 text-indigo-600 dark:text-purple-400" />
-            Notifications
+          <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/30 mb-4">
+            <Bell className="h-6 w-6 text-purple-400" />
+            <span className="font-semibold text-white">Notifications</span>
+          </div>
+
+          <h1 className="text-5xl md:text-6xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 drop-shadow-lg">
+            Your Story Updates
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            {unreadCount > 0 && (
-              <span className="inline-flex items-center gap-1">
+
+          <p className="mt-3 text-lg text-gray-700 dark:text-gray-300">
+            {unreadCount > 0 ? (
+              <span className="inline-flex items-center gap-2">
                 <span className="h-2 w-2 bg-red-500 rounded-full animate-pulse"></span>
-                {unreadCount} unread
+                <strong>{unreadCount} unread</strong> — stay in the loop!
               </span>
+            ) : (
+              "You're all caught up! <Sparkles className=\"inline h-5 w-5 text-yellow-400\" />"
             )}
-            {unreadCount === 0 && "You're all caught up!"}
           </p>
         </motion.div>
 
-        {/* Actions Bar */}
-        <div className="flex gap-3 mb-6">
-          <button
-            onClick={() => setFilter("all")}
-            className={`flex-1 py-3 px-6 rounded-2xl font-semibold transition-all shadow-sm ${
-              filter === "all"
-                ? "bg-indigo-600 text-white"
-                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            All ({notifications.length})
-          </button>
-          <button
-            onClick={() => setFilter("unread")}
-            className={`flex-1 py-3 px-6 rounded-2xl font-semibold transition-all shadow-sm ${
-              filter === "unread"
-                ? "bg-indigo-600 text-white"
-                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            Unread ({unreadCount})
-          </button>
-          {unreadCount > 0 && (
+        {/* Filter Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex gap-3 mb-8"
+        >
+          {[
+            { label: "All", value: "all", count: notifications.length },
+            { label: "Unread", value: "unread", count: unreadCount },
+          ].map((tab) => (
             <button
+              key={tab.value}
+              onClick={() => setFilter(tab.value as any)}
+              className={`flex-1 py-3.5 px-6 rounded-2xl font-bold text-lg transition-all shadow-lg backdrop-blur-xl border ${
+                filter === tab.value
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 text-white border-white/30 shadow-purple-500/30"
+                  : "bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-white/70 dark:hover:bg-gray-700/70"
+              }`}
+            >
+              {tab.label} ({tab.count})
+            </button>
+          ))}
+
+          {unreadCount > 0 && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={markAllAsRead}
-              className="px-4 py-3 bg-emerald-600 text-white rounded-2xl font-medium hover:bg-emerald-700 transition"
+              className="px-5 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-bold shadow-lg backdrop-blur-xl border border-white/20 flex items-center gap-2"
             >
               <CheckCircle className="h-5 w-5" />
-            </button>
+              Mark All
+            </motion.button>
           )}
-        </div>
+        </motion.div>
 
-        {/* Loading */}
+        {/* Loading State */}
         {loading && (
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex justify-center py-20"
+          >
+            <div className="animate-spin rounded-full h-14 w-14 border-4 border-purple-500 border-t-transparent"></div>
+          </motion.div>
         )}
 
         {/* Empty State */}
@@ -230,115 +250,169 @@ export default function NotificationsPage() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="text-center py-20"
+              className="text-center py-24"
             >
-              <Bell className="mx-auto h-20 w-20 text-gray-300 dark:text-gray-700 mb-6" />
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <motion.div
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Bell className="mx-auto h-24 w-24 text-gray-400 dark:text-gray-600 mb-6" />
+              </motion.div>
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
                 No notifications yet
               </h3>
               <p className="text-gray-600 dark:text-gray-400">
-                Publish a chapter to get started!
+                Publish your first chapter to get started!
               </p>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Notifications List */}
-        <ul className="space-y-4">
+        <motion.ul
+          className="space-y-5"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
           <AnimatePresence>
             {filteredNotifications.map((notif, idx) => (
-              <motion.li
+              <NotificationCard
                 key={notif.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, x: -100 }}
-                transition={{ delay: idx * 0.05 }}
-                className={`bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-lg border ${
-                  !notif.read
-                    ? "border-indigo-300 dark:border-purple-600 ring-2 ring-indigo-200 dark:ring-purple-800/30"
-                    : "border-gray-200 dark:border-gray-700"
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  {/* Icon */}
-                  <div
-                    className={`flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center ${
-                      notif.type === "published"
-                        ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400"
-                        : "bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400"
-                    }`}
-                  >
-                    {notif.type === "published" ? (
-                      <Globe className="h-6 w-6" />
-                    ) : (
-                      <Eye className="h-6 w-6" />
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className={`font-bold text-lg ${!notif.read ? "text-indigo-600 dark:text-purple-400" : "text-gray-900 dark:text-gray-100"}`}>
-                          {notif.type === "published" ? "Chapter Published!" : "Readers Are Loving It!"}
-                        </h3>
-                        <p className="text-gray-700 dark:text-gray-300 mt-1 font-medium">
-                          {notif.message}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2 text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">in</span>
-                          <Link
-                            href={`/story-studio/${notif.bookId}`}
-                            className="font-semibold text-indigo-600 dark:text-purple-400 hover:underline"
-                          >
-                            {notif.bookTitle}
-                          </Link>
-                          <span className="text-gray-500 dark:text-gray-400">→</span>
-                          <span className="font-medium truncate max-w-[180px]">
-                            {notif.chapterTitle}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        {!notif.read && (
-                          <button
-                            onClick={() => markAsRead(notif.id)}
-                            className="p-2 rounded-xl bg-indigo-100 dark:bg-purple-900/50 hover:bg-indigo-200 dark:hover:bg-purple-800 transition"
-                          >
-                            <CheckCircle className="h-5 w-5 text-indigo-600 dark:text-purple-400" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => deleteNotification(notif.id)}
-                          className="p-2 rounded-xl bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800 transition"
-                        >
-                          <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">
-                      {notif.timestamp.toLocaleTimeString()} • {notif.timestamp.toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </motion.li>
+                notif={notif}
+                index={idx}
+                onMarkRead={markAsRead}
+                onDelete={deleteNotification}
+                theme={theme}
+              />
             ))}
           </AnimatePresence>
-        </ul>
+        </motion.ul>
 
         {/* Back Link */}
-        <div className="mt-12 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mt-16 text-center"
+        >
           <Link
             href="/story"
-            className="inline-flex items-center gap-2 text-indigo-600 dark:text-purple-400 hover:underline text-lg font-medium"
+            className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold hover:bg-white/70 dark:hover:bg-gray-700/70 transition-all shadow-md"
           >
-            ← Back to My Stories
+            <ArrowLeft className="h-5 w-5" />
+            Back to My Stories
           </Link>
-        </div>
+        </motion.div>
       </div>
     </div>
+  );
+}
+
+// Extracted Reusable Notification Card
+function NotificationCard({
+  notif,
+  index,
+  onMarkRead,
+  onDelete,
+  theme,
+}: {
+  notif: Notification;
+  index: number;
+  onMarkRead: (id: string) => void;
+  onDelete: (id: string) => void;
+  theme: "light" | "dark";
+}) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true });
+
+  const gradient = notif.type === "published"
+    ? "from-emerald-500 to-teal-600 dark:from-emerald-400 dark:to-cyan-500"
+    : "from-purple-500 to-pink-600 dark:from-violet-400 dark:to-pink-500";
+
+  return (
+    <motion.li
+      ref={ref}
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+      exit={{ opacity: 0, x: -100, scale: 0.9 }}
+      transition={{ duration: 0.5, delay: index * 0.08 }}
+      whileHover={{ y: -6, scale: 1.02 }}
+      className="group relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden"
+      style={{ transformStyle: "preserve-3d" }}
+    >
+      {/* Hover Glow */}
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-3xl blur opacity-0 group-hover:opacity-70 transition duration-500" />
+
+      <div className="relative z-10 flex items-start gap-4">
+        {/* Icon */}
+        <div className={`p-3 rounded-2xl bg-gradient-to-r ${gradient} shadow-lg`}>
+          {notif.type === "published" ? (
+            <Globe className="h-7 w-7 text-white" />
+          ) : (
+            <Eye className="h-7 w-7 text-white" />
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            {notif.type === "published" ? "Chapter Published!" : "Readers Are Loving It!"}
+          </h3>
+          <p className="mt-1 text-gray-700 dark:text-gray-300 font-medium">
+            {notif.message}
+          </p>
+
+          <div className="flex items-center gap-2 mt-3 text-sm">
+            <span className="text-gray-500 dark:text-gray-400">in</span>
+            <Link
+              href={`/story-studio/${notif.bookId}`}
+              className="font-bold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              {notif.bookTitle}
+            </Link>
+            <span className="text-gray-500 dark:text-gray-400">→</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300 truncate max-w-[200px]">
+              {notif.chapterTitle}
+            </span>
+          </div>
+
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+            {notif.timestamp.toLocaleString()}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {!notif.read && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onMarkRead(notif.id)}
+              className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md"
+            >
+              <CheckCircle className="h-5 w-5" />
+            </motion.button>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => onDelete(notif.id)}
+            className="p-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md"
+          >
+            <Trash2 className="h-5 w-5" />
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Unread Indicator */}
+      {!notif.read && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute top-6 right-6 h-3 w-3 bg-red-500 rounded-full"
+        />
+      )}
+    </motion.li>
   );
 }

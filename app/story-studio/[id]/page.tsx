@@ -7,6 +7,7 @@ import {
   motion,
   AnimatePresence,
   Reorder,
+  useInView,
 } from "framer-motion";
 import {
   useEditor,
@@ -78,6 +79,7 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext"; // ADDED
 import { db } from "../../firebaseconfig";
 import {
   doc,
@@ -126,20 +128,6 @@ const STYLES: WritingStyle[] = [
   { name: "Journal", icon: PenTool, prompt: "Today I felt… Here's what happened…" },
   { name: "Poetry", icon: Heart, prompt: "Free verse, metaphors, rhythm…" },
 ];
-
-// ────── Theme Context ──────
-interface ThemeContextType {
-  theme: "light" | "dark" | "auto";
-  setTheme: (theme: "light" | "dark" | "auto") => void;
-  autoSave: boolean;
-  toggleAutoSave: () => void;
-}
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) throw new Error("useTheme must be used within ThemeProvider");
-  return context;
-};
 
 // ────── Editor Extensions ──────
 const FontSize = Extension.create({
@@ -205,6 +193,7 @@ export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
+  const { theme } = useTheme(); // ADDED
   const isMobile = useIsMobile();
 
   const [bookTitle, setBookTitle] = useState("My Life Story");
@@ -225,8 +214,6 @@ export default function EditorPage() {
   const [colorMode, setColorMode] = useState<"text" | "highlight">("text");
   const [currentColor, setCurrentColor] = useState({ r: 99, g: 102, b: 241 });
   const [showSettings, setShowSettings] = useState(false);
-
-  const [theme, setTheme] = useState<"light" | "dark" | "auto">("auto");
   const [autoSave, setAutoSave] = useState(true);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -236,6 +223,8 @@ export default function EditorPage() {
   const isOnline = useRef(true);
   const saveTimeout = useRef<NodeJS.Timeout>();
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(statsRef, { once: true });
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -273,29 +262,12 @@ export default function EditorPage() {
     },
   });
 
-  useEffect(() => {
-    if (theme === "auto") {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      document.documentElement.classList.toggle("dark", prefersDark);
-    } else {
-      document.documentElement.classList.toggle("dark", theme === "dark");
-    }
-  }, [theme]);
-
-  // FIXED: Guard against undefined pages + safer loading
   const totalWords = useMemo(() => {
-    return chapters.reduce((acc: number, ch: Chapter) => {
-      const pages = ch.pages ?? [];
-      return (
-        acc +
-        pages.reduce((pacc: number, p: Page) => {
-          const txt =
-            p.content?.content
-              ?.map((n: any) => (n.type === "text" ? n.text : ""))
-              .join(" ") || "";
-          return pacc + txt.split(/\s+/).filter(Boolean).length;
-        }, 0)
-      );
+    return chapters.reduce((acc, ch) => {
+      return acc + (ch.pages ?? []).reduce((pacc, p) => {
+        const txt = p.content?.content?.map((n: any) => n.type === "text" ? n.text : "").join(" ") || "";
+        return pacc + txt.split(/\s+/).filter(Boolean).length;
+      }, 0);
     }, 0);
   }, [chapters]);
 
@@ -568,11 +540,10 @@ export default function EditorPage() {
     if (!user?.email) return toast.error("User email missing");
     setIsSaving(true);
     try {
-      const excerpt =
-        chapters[0]?.pages[0]?.content?.content
-          ?.map((n: any) => (n.type === "text" ? n.text : ""))
-          .join(" ")
-          .slice(0, 200) + "...";
+      const excerpt = chapters[0]?.pages[0]?.content?.content
+        ?.map((n: any) => (n.type === "text" ? n.text : ""))
+        .join(" ")
+        .slice(0, 200) + "...";
       const payload = {
         title: bookTitle,
         author: user.fullName || user.email,
@@ -646,17 +617,16 @@ export default function EditorPage() {
       disabled={disabled}
       className={`p-2 rounded-lg transition-all ${
         active
-          ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
-          : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-      } ${disabled ? "opacity-40 cursor not-allowed" : ""}`}
+          ? "bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 text-indigo-700 dark:text-indigo-300 shadow-md"
+          : "bg-white/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-white/90 dark:hover:bg-gray-600/90 backdrop-blur"
+      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
     >
       {children}
     </motion.button>
   );
 
-  const Divider = () => <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />;
+  const Divider = () => <div className="w-px h-6 bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600 mx-1" />;
 
-  // ────── TOOLBAR CONTENT (shared between desktop & mobile) ──────
   const ToolbarContent = () => (
     <>
       {activeTab === "home" && (
@@ -690,7 +660,7 @@ export default function EditorPage() {
         </>
       )}
       {activeTab === "insert" && (
-        <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium cursor-pointer hover:shadow-md transition-shadow">
+        <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium cursor-pointer hover:shadow-md transition-shadow backdrop-blur">
           <ImageIcon className="h-4 w-4" />
           Insert Image
           <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -704,10 +674,10 @@ export default function EditorPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => { setStyle(s); triggerSave(); }}
-              className={`p-2.5 rounded-xl border transition-all flex flex-col items-center text-xs font-medium ${
+              className={`p-2.5 rounded-xl border-2 transition-all flex flex-col items-center text-xs font-medium backdrop-blur ${
                 style.name === s.name
-                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm"
-                  : "border-gray-300 dark:border-gray-600 hover:border-indigo-400"
+                  ? "border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/40 shadow-lg"
+                  : "border-gray-300 dark:border-gray-600 hover:border-indigo-400 bg-white/70 dark:bg-gray-700/70"
               }`}
             >
               <s.icon className="h-5 w-5 mb-1" />
@@ -726,7 +696,6 @@ export default function EditorPage() {
     </>
   );
 
-  // ────── VERTICAL POPOVERS (CARD STYLE) ──────
   const VerticalPopover = ({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) => (
     <AnimatePresence>
       {show && (
@@ -734,11 +703,11 @@ export default function EditorPage() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          className="fixed top-20 right-4 z-50 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+          className="fixed top-20 right-4 z-50 w-64 bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="font-semibold">{title}</h3>
+          <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-700/50">
+            <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
             <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
               <X className="h-4 w-4" />
             </button>
@@ -752,8 +721,35 @@ export default function EditorPage() {
   );
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, autoSave, toggleAutoSave: () => setAutoSave(!autoSave) }}>
+    <>
       <Toaster position="top-center" />
+
+      {/* Floating CTA */}
+      <motion.a
+        href="/story-studio"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-500 dark:to-purple-500 text-white px-5 py-3 rounded-full shadow-2xl font-semibold text-sm backdrop-blur-xl border border-white/20"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 1 }}
+      >
+        Back to Studio <Sparkles className="h-4 w-4 animate-pulse" />
+      </motion.a>
+
+      {/* Animated Background Blobs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <motion.div
+          animate={{ x: [0, 120, 0], y: [0, -80, 0] }}
+          transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+          className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-br from-indigo-400/20 to-purple-500/20 rounded-full blur-3xl"
+        />
+        <motion.div
+          animate={{ x: [0, -100, 0], y: [0, 100, 0] }}
+          transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-tr from-pink-400/20 to-orange-500/20 rounded-full blur-3xl"
+        />
+      </div>
 
       {/* POPOVERS */}
       <VerticalPopover show={showColorPicker} onClose={() => setShowColorPicker(false)} title={colorMode === "text" ? "Text Color" : "Highlight Color"}>
@@ -785,20 +781,6 @@ export default function EditorPage() {
 
       <VerticalPopover show={showSettings} onClose={() => setShowSettings(false)} title="Settings">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Theme</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => setTheme("light")} className={`py-2 rounded-lg flex items-center justify-center gap-2 ${theme === "light" ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 dark:bg-gray-700"}`}>
-                <Sun className="h-4 w-4" /> Light
-              </button>
-              <button onClick={() => setTheme("dark")} className={`py-2 rounded-lg flex items-center justify-center gap-2 ${theme === "dark" ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 dark:bg-gray-700"}`}>
-                <Moon className="h-4 w-4" /> Dark
-              </button>
-              <button onClick={() => setTheme("auto")} className={`py-2 rounded-lg flex items-center justify-center gap-2 ${theme === "auto" ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 dark:bg-gray-700"}`}>
-                <Settings className="h-4 w-4" /> Auto
-              </button>
-            </div>
-          </div>
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium">Auto Save</label>
             <button onClick={() => setAutoSave(!autoSave)} className={`w-12 h-6 rounded-full transition-all ${autoSave ? "bg-indigo-600" : "bg-gray-300"} relative`}>
@@ -812,7 +794,7 @@ export default function EditorPage() {
       <AnimatePresence>
         {showUnsavedDialog && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setShowUnsavedDialog(false)}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 max-w-sm w-full border border-white/30 dark:border-gray-700/50" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-3 mb-4">
                 <AlertCircle className="h-8 w-8 text-amber-500" />
                 <h3 className="text-xl font-bold">Unsaved Changes</h3>
@@ -897,10 +879,9 @@ export default function EditorPage() {
         </>
       )}
 
-      {/* MOBILE BOTTOM NAV & TOOLBAR (FIXED: now renders real tools) */}
+      {/* MOBILE BOTTOM NAV & TOOLBAR */}
       {isMobile && (
         <>
-          {/* Bottom navigation tabs */}
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50">
             <div className="flex items-center justify-around py-2">
               <button onClick={() => setActiveTab("home")} className={`p-3 rounded-xl flex flex-col items-center gap-1 ${activeTab === "home" ? "text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30" : "text-gray-500"}`}>
@@ -926,7 +907,6 @@ export default function EditorPage() {
             </div>
           </div>
 
-          {/* Mobile floating toolbar - now shows ACTUAL tools */}
           <div className="fixed bottom-20 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t border-gray-200/30 dark:border-gray-700/30 shadow-lg">
             <div className="flex items-center gap-1.5 p-3 overflow-x-auto scrollbar-hide">
               <ToolbarContent />
@@ -936,11 +916,10 @@ export default function EditorPage() {
       )}
 
       {/* SIDEBAR */}
-      <div ref={sidebarRef} className={`fixed top-16 left-0 h-full w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-40 transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 overflow-y-auto`}>
-        {/* ... sidebar content unchanged ... */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-inherit z-10">
+      <div ref={sidebarRef} className={`fixed top-16 left-0 h-full w-80 bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl border-r border-white/30 dark:border-gray-700/50 z-40 transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 overflow-y-auto`}>
+        <div className="p-4 border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 bg-inherit/90 backdrop-blur z-10">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Outline</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Outline</h2>
             {isMobile && <button onClick={() => setSidebarOpen(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"><X className="h-5 w-5" /></button>}
           </div>
           <div className="flex gap-2">
@@ -967,11 +946,37 @@ export default function EditorPage() {
             </label>
           </div>
         </div>
+
+        {/* Stats */}
+        <div ref={statsRef} className="p-4 grid grid-cols-3 gap-3">
+          {[
+            { label: "Words", value: totalWords.toLocaleString() },
+            { label: "Chapters", value: chapters.length },
+            { label: "Pages", value: chapters.reduce((a, c) => a + c.pages.length, 0) },
+          ].map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: i * 0.1 }}
+              className="p-3 rounded-xl bg-white/70 dark:bg-gray-700/70 backdrop-blur text-center"
+            >
+              <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
+                {stat.value}
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{stat.label}</p>
+            </motion.div>
+          ))}
+        </div>
+
         <Reorder.Group values={chapters} onReorder={setChapters}>
           <div className="p-4 space-y-3 pb-32">
             {chapters.map((ch: Chapter, chIdx: number) => (
               <Reorder.Item key={ch.id} value={ch} className="cursor-grab active:cursor-grabbing">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-3">
+                <motion.div
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  className="bg-white/70 dark:bg-gray-700/70 backdrop-blur-xl rounded-xl p-3 shadow-md border border-white/30 dark:border-gray-700/50"
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 flex-1">
                       <GripVertical className="h-5 w-5 text-gray-400" />
@@ -1003,8 +1008,8 @@ export default function EditorPage() {
                           animate={{ opacity: 1, x: 0 }}
                           className={`group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
                             activeChapterIdx === chIdx && activePageIdx === pIdx
-                              ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300"
-                              : "hover:bg-gray-200 dark:hover:bg-gray-600"
+                              ? "bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 text-indigo-700 dark:text-indigo-300"
+                              : "hover:bg-white/50 dark:hover:bg-gray-600/50"
                           }`}
                           onClick={() => {
                             setActiveChapterIdx(chIdx);
@@ -1050,7 +1055,7 @@ export default function EditorPage() {
                       </motion.button>
                     </div>
                   )}
-                </div>
+                </motion.div>
               </Reorder.Item>
             ))}
           </div>
@@ -1058,7 +1063,7 @@ export default function EditorPage() {
       </div>
 
       {/* MAIN EDITOR */}
-      <div className="pt-16 md:pl-80 min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-indigo-900 dark:to-purple-900">
+      <div className="pt-16 md:pl-80 min-h-screen bg-gradient-to-br from-indigo-50/50 via-purple-50/50 to-pink-50/50 dark:from-gray-900 dark:via-indigo-950 dark:to-purple-950">
         <div className="max-w-4xl mx-auto p-4 md:p-8">
           <div className="mb-8">
             <div className="relative aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-2xl overflow-hidden shadow-xl">
@@ -1073,7 +1078,7 @@ export default function EditorPage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
+          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/30 dark:border-gray-700/50">
             {isPreview ? (
               <div className="prose prose-lg max-w-none p-8" dangerouslySetInnerHTML={{ __html: currentPages[activePageIdx]?.html || "" }} />
             ) : (
@@ -1087,6 +1092,6 @@ export default function EditorPage() {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
       `}</style>
-    </ThemeContext.Provider>
+    </>
   );
 }

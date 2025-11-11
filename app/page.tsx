@@ -1,4 +1,3 @@
-// app/page.tsx
 "use client";
 
 import { motion, useInView } from "framer-motion";
@@ -10,35 +9,37 @@ import {
   Star,
   Zap,
   Shield,
-  Globe,
   ArrowRight,
   Sparkles,
-  QrCode,
-  Activity,
-  Calendar,
-  Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./context/AuthContext";
+import { useTheme } from "./context/ThemeContext"; // Added theme context import
 import Link from "next/link";
 
 export default function Home() {
+  // Use Contexts
   const { isLoggedIn } = useAuth();
+  const { theme } = useTheme(); // Get the current theme to enable dynamic color selection
+
   const [stats, setStats] = useState({ bios: 0, users: 0, stories: 0 });
 
+  // Define service data with dual-mode gradients
   const services = [
     {
       title: "Biography Creation",
       slug: "biography-creation",
-      description: "Craft compelling life stories with AI-powered writing and human refinement.",
+      description:
+        "Craft compelling life stories with AI-powered writing and human refinement.",
       icon: BookOpen,
-      color: "from-blue-500 to-purple-600",
-      darkColor: "from-blue-400 to-purple-500",
+      color: "from-blue-500 to-purple-600", // Light mode gradient
+      darkColor: "from-blue-400 to-purple-500", // Dark mode gradient
     },
     {
       title: "Secure Hosting",
       slug: "secure-hosting",
-      description: "Host your biography on enterprise-grade, encrypted, global servers.",
+      description:
+        "Host your biography on enterprise-grade, encrypted, global servers.",
       icon: Server,
       color: "from-green-500 to-teal-600",
       darkColor: "from-emerald-400 to-cyan-500",
@@ -46,7 +47,8 @@ export default function Home() {
     {
       title: "Customization",
       slug: "customization",
-      description: "Personalize every pixel with themes, media, and interactive elements.",
+      description:
+        "Personalize every pixel with themes, media, and interactive elements.",
       icon: User,
       color: "from-purple-500 to-pink-600",
       darkColor: "from-violet-400 to-pink-500",
@@ -54,7 +56,8 @@ export default function Home() {
     {
       title: "Easy Sharing",
       slug: "easy-sharing",
-      description: "Share instantly with QR, embeds, social, and track engagement.",
+      description:
+        "Share instantly with QR, embeds, social, and track engagement.",
       icon: Share2,
       color: "from-orange-500 to-red-600",
       darkColor: "from-orange-400 to-rose-500",
@@ -82,7 +85,7 @@ export default function Home() {
     },
   ];
 
-  // Stats Counter
+  // Stats Counter Logic
   const statsRef = useRef<HTMLDivElement>(null);
   const inView = useInView(statsRef, { once: true });
 
@@ -90,9 +93,10 @@ export default function Home() {
     if (inView) {
       const interval = setInterval(() => {
         setStats((s) => ({
-          bios: s.bios < 10500 ? s.bios + 137 : 10500,
-          users: s.users < 3200 ? s.users + 41 : 3200,
-          stories: s.stories < 8500 ? s.stories + 112 : 8500,
+          // Ensures we stop exactly at the target numbers (10500, 3200, 8500)
+          bios: s.bios < 10500 ? Math.min(10500, s.bios + 137) : 10500, 
+          users: s.users < 3200 ? Math.min(3200, s.users + 41) : 3200,
+          stories: s.stories < 8500 ? Math.min(8500, s.stories + 112) : 8500,
         }));
       }, 30);
       return () => clearInterval(interval);
@@ -116,8 +120,9 @@ export default function Home() {
         </motion.a>
       )}
 
-      {/* HERO */}
+      {/* HERO SECTION */}
       <section className="relative overflow-hidden py-24 px-4">
+        {/* Background Animation Blobs */}
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20 dark:from-blue-500/10 dark:via-purple-500/10 dark:to-pink-500/10 blur-3xl">
           <motion.div
             animate={{ x: [0, 100, 0], y: [0, -100, 0] }}
@@ -138,7 +143,7 @@ export default function Home() {
             transition={{ duration: 0.8 }}
             className="mb-6"
           >
-            <span className="inline-block px-4 py-1 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/30 text-sm font-medium text-white">
+            <span className="inline-block px-4 py-1 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/30 text-sm font-medium text-white shadow-md">
               <Zap className="inline h-4 w-4 mr-1" />
               Trusted by 3,200+ storytellers
             </span>
@@ -148,7 +153,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400"
+            className="text-5xl md:text-7xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 drop-shadow-lg"
           >
             {isLoggedIn ? "Your Legacy, Live" : "Host Your Life Story"}
           </motion.h1>
@@ -176,16 +181,35 @@ export default function Home() {
                 href="/signup"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 rounded-full text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 shadow-xl backdrop-blur-xl border border-white/20 flex items-center justify-center gap-2"
+                className="px-8 py-4 rounded-full text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 shadow-xl backdrop-blur-xl border border-white/20 flex items-center justify-center gap-2 transition duration-300"
               >
                 Get Started <ArrowRight className="h-5 w-5" />
               </motion.a>
             )}
+            {isLoggedIn && (
+              <motion.a
+                href="/profile"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 rounded-full text-lg font-semibold text-white bg-gradient-to-r from-pink-600 to-orange-600 dark:from-pink-500 dark:to-orange-500 shadow-xl backdrop-blur-xl border border-white/20 flex items-center justify-center gap-2 transition duration-300"
+              >
+                View My Bio <BookOpen className="h-5 w-5" />
+              </motion.a>
+            )}
+            {/* Secondary CTA */}
+            <motion.a
+              href="/pricing"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-8 py-4 rounded-full text-lg font-semibold text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 backdrop-blur-xl flex items-center justify-center gap-2 shadow-inner transition duration-300"
+            >
+              View Pricing
+            </motion.a>
           </motion.div>
         </div>
       </section>
 
-      {/* LIVE STATS – "Countries" → "Active Stories" */}
+      {/* LIVE STATS */}
       <section className="py-16 px-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl border-y border-gray-200/50 dark:border-gray-700/50">
         <div className="max-w-7xl mx-auto">
           <div ref={statsRef} className="grid grid-cols-3 gap-8 text-center">
@@ -201,7 +225,8 @@ export default function Home() {
                 transition={{ delay: i * 0.2 }}
               >
                 <div className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
-                  {stat.value.toLocaleString()}{stat.suffix}
+                  {stat.value.toLocaleString()}
+                  {stat.suffix}
                 </div>
                 <p className="mt-2 text-gray-600 dark:text-gray-300 font-medium">
                   {stat.label}
@@ -211,112 +236,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* LOGGED IN DASHBOARD – NO "Create New Bio" / "View My Bio" */}
-      {isLoggedIn && (
-        <section className="py-20 px-4 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-          <div className="max-w-7xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-12"
-            >
-              <h2 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
-                Your Bio Dashboard
-              </h2>
-              <p className="mt-3 text-lg text-gray-600 dark:text-gray-300">
-                Manage, share, and track your legacy.
-              </p>
-            </motion.div>
-
-            {/* QUICK ACTIONS – ONLY "Share & QR" */}
-            <div className="flex justify-center mb-12">
-              <motion.a
-                href="/share"
-                whileHover={{ y: -8, scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
-                className="group relative bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden w-full max-w-md"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 p-3 mb-4 shadow-lg">
-                  <QrCode className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                  Share & QR
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Generate QR, embed, or share your bio instantly.
-                </p>
-                <ArrowRight className="absolute bottom-4 right-4 h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-all group-hover:translate-x-1" />
-              </motion.a>
-            </div>
-
-            {/* RECENT ACTIVITY */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50 mb-8">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-green-500" />
-                Recent Activity
-              </h3>
-              <div className="space-y-3">
-                {[
-                  { action: "Updated bio title", time: "2 hours ago", icon: Calendar },
-                  { action: "Shared with 12 people", time: "5 hours ago", icon: Share2 },
-                  { action: "Added new photo", time: "1 day ago", icon: BookOpen },
-                ].map((act, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 p-2">
-                      <act.icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {act.action}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {act.time}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* PROFILE PREVIEW */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 text-white shadow-2xl"
-            >
-              <div className="flex items-center gap-6">
-                <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-md border-4 border-white/30 flex items-center justify-center">
-                  <User className="h-12 w-12 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold">Welcome back, Alex!</h3>
-                  <p className="text-white/80">Your bio has been viewed 342 times</p>
-                  <div className="flex gap-4 mt-3">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      <span className="text-sm">87 shares</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-400" />
-                      <span className="text-sm">4.9 rating</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      )}
 
       {/* SERVICES */}
       <section className="py-24 px-4">
@@ -338,6 +257,10 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {services.map((s, i) => {
               const Icon = s.icon;
+              // Dynamically select the gradient class based on the current theme state
+              const gradientClass =
+                theme === "dark" ? s.darkColor : s.color;
+              
               return (
                 <motion.div
                   key={s.slug}
@@ -346,34 +269,41 @@ export default function Home() {
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: i * 0.1 }}
                   whileHover={{ y: -8, scale: 1.02 }}
-                  className="group relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden"
+                  className="group relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden cursor-pointer"
                 >
+                  <Link
+                    href={`/learn?service=${s.slug}`}
+                    className="absolute inset-0 z-10" // Make the whole card clickable
+                  >
+                    <span className="sr-only">
+                      Learn more about {s.title}
+                    </span>
+                  </Link>
+
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div
-                    className={`p-3 rounded-xl mb-4 w-fit bg-gradient-to-r ${s.color} dark:${s.darkColor} shadow-lg`}
+                    // Use the dynamic gradient class
+                    className={`p-3 rounded-xl mb-4 w-fit bg-gradient-to-r ${gradientClass} shadow-lg relative z-20`}
                   >
                     <Icon className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 relative z-20">
                     {s.title}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+                  <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed relative z-20">
                     {s.description}
                   </p>
 
                   <motion.div
-                    className="mt-5"
+                    className="mt-5 relative z-20"
                     initial={{ opacity: 0, x: -10 }}
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                   >
-                    <Link
-                      href={`/learn?service=${s.slug}`}
-                      className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-semibold text-sm hover:gap-2.5 transition-all duration-200"
-                    >
-                      Learn more
+                    <div className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-semibold text-sm hover:gap-2.5 transition-all duration-200">
+                      Read more
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </Link>
+                    </div>
                   </motion.div>
                 </motion.div>
               );
@@ -385,6 +315,7 @@ export default function Home() {
       {/* TESTIMONIALS */}
       <section className="py-24 px-4 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
+          {/* Animated background stars/blobs */}
           <motion.div
             animate={{ x: [0, 100, 0], y: [0, -50, 0] }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -435,8 +366,12 @@ export default function Home() {
                 className="group relative"
                 style={{ transformStyle: "preserve-3d" }}
               >
+                {/* Hover Glow Effect */}
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-3xl blur opacity-0 group-hover:opacity-100 transition duration-500" />
+                
                 <div className="relative h-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 dark:border-gray-700/50 overflow-hidden">
+                  
+                  {/* Internal Animated Stars */}
                   <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     {[...Array(6)].map((_, s) => (
                       <motion.div
@@ -462,6 +397,7 @@ export default function Home() {
                     ))}
                   </div>
 
+                  {/* Rating Stars */}
                   <div className="flex items-center mb-5">
                     {[...Array(t.rating)].map((_, j) => (
                       <motion.div
@@ -475,12 +411,13 @@ export default function Home() {
                     ))}
                   </div>
 
-                  <p className="text-lg md:text-xl font-medium text-gray-700 dark:text-gray-200 italic mb-6 leading-relaxed relative z-10">
+                  <p className="text-lg md:text-xl font-medium text-gray-700 dark:text-white italic mb-6 leading-relaxed relative z-10">
                     "{t.quote}"
                   </p>
 
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500 p-0.5">
+                    {/* Author Avatar Placeholder */}
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500 p-0.5 shadow-md">
                       <div className="w-full h-full rounded-full bg-white dark:bg-gray-800 flex items-center justify-center">
                         <User className="h-6 w-6 text-blue-600 dark:text-yellow-400" />
                       </div>
@@ -496,6 +433,7 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Bottom Separator */}
                 <motion.div
                   className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity"
                   initial={{ scaleX: 0 }}
@@ -518,7 +456,7 @@ export default function Home() {
                 <motion.div
                   key={i}
                   whileHover={{ scale: 1.1 }}
-                  className="px-4 py-2 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/30 text-sm font-medium text-white"
+                  className="px-4 py-2 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/30 text-sm font-medium text-gray-700 dark:text-white shadow-md transition duration-300 cursor-default"
                 >
                   {badge}
                 </motion.div>
@@ -548,7 +486,7 @@ export default function Home() {
             href={isLoggedIn ? "/share" : "/signup"}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-white text-blue-600 dark:text-blue-600 font-bold text-lg shadow-lg"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-white text-blue-600 dark:text-blue-600 font-bold text-lg shadow-lg hover:shadow-xl transition duration-300"
           >
             {isLoggedIn ? "Share Now" : "Get Started Now"} <Shield className="h-5 w-5" />
           </motion.a>
