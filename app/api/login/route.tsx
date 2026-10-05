@@ -1,41 +1,11 @@
 // app/api/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { getAuth } from "firebase-admin/auth";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminAuth, getAdminDb } from "../../lib/admin";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 if (!JWT_SECRET) throw new Error("JWT_SECRET missing");
 
-// ---------- ADMIN SDK INITIALISATION ----------
-let adminInited = false;
-function initAdmin() {
-  if (adminInited) return;
-  const svc = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!svc) throw new Error("FIREBASE_SERVICE_ACCOUNT missing");
-
-  const serviceAccount = JSON.parse(svc) as {
-    project_id: string;
-    client_email: string;
-    private_key: string;
-  };
-
-  if (!getApps().length) {
-    initializeApp({
-      credential: cert({
-        projectId: serviceAccount.project_id,
-        clientEmail: serviceAccount.client_email,
-        privateKey: serviceAccount.private_key.replace(/\\n/g, "\n"),
-      }),
-    });
-  }
-  adminInited = true;
-}
-initAdmin();
-
-const adminAuth = getAuth();
-const adminDb = getFirestore();
 // ---------------------------------------------
 
 export async function OPTIONS() {
@@ -48,6 +18,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const adminAuth = getAdminAuth();
+  const adminDb = getAdminDb();
+
   try {
     const { email, password, rememberMe } = await request.json();
     const authHeader = request.headers.get("Authorization");
@@ -112,7 +85,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ---------- USER IS FULLY REGISTERED → ALLOW LOGIN ----------
-    const role = "user";
+    const customerData = snap.docs[0].data();
+    const role = customerData.role || "student";
 
     const token = jwt.sign(
       { uid, email: normalizedEmail, role },

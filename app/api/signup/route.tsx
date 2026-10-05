@@ -1,40 +1,10 @@
 import { NextResponse, NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminAuth, getAdminDb } from "../../lib/admin";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 if (!JWT_SECRET) throw new Error("JWT_SECRET missing");
 
-// ---------- ADMIN SDK INITIALISATION ----------
-let adminInited = false;
-function initAdmin() {
-  if (adminInited) return;
-  const svc = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!svc) throw new Error("FIREBASE_SERVICE_ACCOUNT missing");
-
-  const serviceAccount = JSON.parse(svc) as {
-    project_id: string;
-    client_email: string;
-    private_key: string;
-  };
-
-  if (!getApps().length) {
-    initializeApp({
-      credential: cert({
-        projectId: serviceAccount.project_id,
-        clientEmail: serviceAccount.client_email,
-        privateKey: serviceAccount.private_key.replace(/\\n/g, "\n"),
-      }),
-    });
-  }
-  adminInited = true;
-}
-initAdmin();
-
-const adminAuth = getAuth();
-const adminDb = getFirestore();
 // ---------------------------------------------
 
 export async function OPTIONS() {
@@ -47,11 +17,16 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const adminAuth = getAdminAuth();
+  const adminDb = getAdminDb();
+
   try {
-    const { email, fullName } = await request.json();
+    const { email, fullName, role } = await request.json();
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
+
+    const selectedRole = role === "tutor" ? "tutor" : role === "admin" ? "admin" : "student";
 
     // ----- Verify Firebase ID token -----
     const authHeader = request.headers.get("Authorization");
@@ -70,13 +45,14 @@ export async function POST(request: NextRequest) {
     const userData = {
       email: email.trim(),
       fullName: fullName?.trim() || "",
+      role: selectedRole,
       createdAt: new Date().toISOString(),
     };
     await adminDb.collection("customers").doc(uid).set(userData, { merge: true });
 
     // ----- Create session cookie -----
     const sessionToken = jwt.sign(
-      { uid, email },
+      { uid, email, role: selectedRole },
       JWT_SECRET,
       { expiresIn: "3d" }
     );
@@ -84,6 +60,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       message: "Signup successful",
       email,
+      role: selectedRole,
     });
 
     response.cookies.set("session_token", sessionToken, {

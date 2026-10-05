@@ -30,24 +30,24 @@ export async function POST(req: Request) {
     const html = `
       <div style="font-family: Arial, sans-serif; background:#f5f3ff; padding:25px;">
         <div style="background:white; border-radius:12px; padding:25px; border:1px solid #ddd;">
-          <h2 style="color:#6d28d9; margin-top:0;">Bio Host Notification</h2>
+          <h2 style="color:#d97706; margin-top:0;">Biruh Tutors Notification</h2>
           <p style="font-size:16px; color:#333;">Hello <strong>${email.split("@")[0]}</strong>,</p>
-          <p style="font-size:16px; color:#333;">Your chapter status has changed:</p>
-          <div style="background:#eef2ff; border-left:4px solid #6366f1; padding:12px; border-radius:6px; margin:15px 0;">
+          <p style="font-size:16px; color:#333;">Your tutoring session status has changed:</p>
+          <div style="background:#fffbeb; border-left:4px solid #f59e0b; padding:12px; border-radius:6px; margin:15px 0;">
             <p style="margin:0; font-size:15px;">
-              <strong>Book:</strong> ${bookTitle}<br/>
-              <strong>Chapter:</strong> ${chapterTitle}<br/>
+              <strong>Subject/Book:</strong> ${bookTitle}<br/>
+              <strong>Session/Chapter:</strong> ${chapterTitle}<br/>
               <strong>Status:</strong> ${statusText}
             </p>
           </div>
-          <p style="font-size:15px; color:#444;">Keep writing — your story matters.</p>
-          <p style="font-size:12px; color:#999; margin-top:20px;">Bio Host | Powered by creativity</p>
+          <p style="font-size:15px; color:#444;">Keep learning — your success matters.</p>
+          <p style="font-size:12px; color:#999; margin-top:20px;">Biruh Tutors | Secure Escrow Tutoring</p>
         </div>
       </div>
     `;
 
     await transporter.sendMail({
-      from: `"Bio Host" <${process.env.GMAIL_EMAIL}>`,
+      from: `"Biruh Tutors" <${process.env.GMAIL_EMAIL}>`,
       to: email,
       subject,
       html,

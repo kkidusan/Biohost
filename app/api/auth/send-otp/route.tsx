@@ -1,22 +1,23 @@
 // app/api/auth/send-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { initAdmin, getAdminDb } from "../../../lib/admin";
-import { FieldValue } from "firebase-admin/firestore";
-
-// === Initialize on first request ===
-initAdmin();
-const adminDb = getAdminDb();
+import { db } from "../../../firebaseconfig";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 // === Nodemailer transporter (reused) ===
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: true,
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: 587,
+  secure: false, // false for port 587 (STARTTLS)
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.SMTP_USER || "wedajiemisgan8@gmail.com",
+    pass: process.env.SMTP_PASS || "jyeanrvhygavytej",
   },
+  tls: {
+    rejectUnauthorized: false,
+  },
+  connectionTimeout: 10000,
+  socketTimeout: 10000,
 });
 
 // === Rate limiter: 1 OTP per minute per email ===
@@ -52,31 +53,33 @@ export async function POST(request: NextRequest) {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
 
     // === Store OTP in Firestore (5 min expiry) ===
-    await adminDb.collection("otps").add({
+    await addDoc(collection(db, "otps"), {
       email: normalizedEmail,
       otp,
       used: false,
-      createdAt: FieldValue.serverTimestamp(),
+      createdAt: serverTimestamp(),
       expiresAt: new Date(now + 5 * 60 * 1000),
     });
 
-    // === Send email ===
+    // === Send email fastly ===
     try {
       await transporter.sendMail({
-        from: `"${process.env.APP_NAME || "MyApp"}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.APP_NAME || "Biruh Tutors"}" <${process.env.SMTP_USER || "wedajiemisgan8@gmail.com"}>`,
         to: normalizedEmail,
-        subject: `Your OTP Code – ${process.env.APP_NAME || "MyApp"}`,
+        subject: `Your Verification Code – ${process.env.APP_NAME || "Biruh Tutors"}`,
         html: `
-          <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-            <h2 style="color: #6b46c1;">${process.env.APP_NAME || "MyApp"}</h2>
-            <p>Your verification code is:</p>
-            <h1 style="font-size: 32px; letter-spacing: 8px; color: #1d3557; margin: 20px 0;">
-              ${otp}
-            </h1>
-            <p><strong>Expires in 5 minutes</strong></p>
-            <p style="color: #666; font-size: 12px;">
-              If you didn't request this, ignore this email.
-            </p>
+          <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #0c0a09; color: #f5f5f4;">
+            <div style="background: #1c1917; border: 1px solid #292524; border-radius: 12px; padding: 30px; max-width: 400px; margin: 0 auto;">
+              <h2 style="color: #f59e0b; margin-top: 0;">Biruh Tutors</h2>
+              <p style="color: #a8a29e;">Your verification code is:</p>
+              <h1 style="font-size: 36px; letter-spacing: 8px; color: #f59e0b; margin: 20px 0; font-family: monospace;">
+                ${otp}
+              </h1>
+              <p style="color: #a8a29e; font-size: 13px;"><strong>Expires in 5 minutes</strong></p>
+              <p style="color: #78716c; font-size: 11px; margin-top: 20px;">
+                If you didn't request this, please ignore this email.
+              </p>
+            </div>
           </div>
         `,
       });

@@ -1,55 +1,47 @@
 // middleware.ts
 import { NextResponse, NextRequest } from "next/server";
 
-// List of valid static routes (without trailing slash)
-const validStaticRoutes = [
-  "",
-  "login",
-  "signup",
-  "forgot-password",
-  "story",
-  "profile",
-  "learn",
-  "notfound",
-  "read",
-  "reset-password",
-  "settings",
-  "notifications",
-  "story-studio", // Added
-];
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Normalize path: remove trailing slashes
   const cleanedPath = pathname.replace(/\/+$/, "");
-  const trimmed = cleanedPath.startsWith("/") ? cleanedPath.slice(1) : cleanedPath;
 
   // Allow root "/"
   if (cleanedPath === "") {
     return NextResponse.next();
   }
 
-  // Allow valid static pages
-  if (validStaticRoutes.includes(trimmed)) {
+  // Allow all valid app routes based on project structure
+  const allowedPrefixes = [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/notifications",
+    "/students",
+    "/tutors",
+    "/admin",
+    "/student",
+    "/tutor",
+    "/onboarding",
+  ];
+
+  if (allowedPrefixes.some((prefix) => cleanedPath === prefix || cleanedPath.startsWith(prefix + "/"))) {
     return NextResponse.next();
   }
 
-  // Allow dynamic story-studio routes: /story-studio/[id]
-  if (cleanedPath.startsWith("/story-studio/") && cleanedPath.split("/").length === 3) {
-    return NextResponse.next();
-  }
-
-  // Allow all static assets in /public
+  // Allow all static assets and Next.js internals
   if (
-    /^\/.*\.(json|png|jpg|jpeg|svg|ico|woff|woff2|ttf|eot)$/.test(pathname) ||
-    pathname.startsWith("/favicon")
+    /^\/.*\.(json|png|jpg|jpeg|svg|ico|woff|woff2|ttf|eot|css|js)$/.test(pathname) ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/_next")
   ) {
     return NextResponse.next();
   }
 
-  // Redirect all other routes to /notfound
-  return NextResponse.redirect(new URL("/notfound", request.url));
+  // Let Next.js handle unhandled routes / 404s naturally
+  return NextResponse.next();
 }
 
 export const config = {

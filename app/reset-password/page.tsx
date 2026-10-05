@@ -1,11 +1,11 @@
 // app/reset-password/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { auth } from "../firebaseconfig";
 import { verifyPasswordResetCode, confirmPasswordReset } from "firebase/auth";
-import { Loader2, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import zxcvbn from "zxcvbn";
@@ -13,7 +13,7 @@ import zxcvbn from "zxcvbn";
 const strengthColors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-lime-500", "bg-green-500"];
 const strengthLabels = ["Weak", "Fair", "Good", "Strong", "Very Strong"];
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const oobCode = searchParams.get("oobCode");
@@ -315,5 +315,19 @@ export default function ResetPasswordPage() {
         </div>
       </main>
     </>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-900">
+          <Loader2 className="animate-spin w-10 h-10 text-indigo-400" />
+        </div>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

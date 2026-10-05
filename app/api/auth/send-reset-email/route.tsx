@@ -3,19 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initAdmin } from "../../../lib/admin";
 
-initAdmin();
-const auth = getAuth();
-
 export async function POST(request: NextRequest) {
   try {
+    initAdmin();
+    const auth = getAuth();
+
     const { email } = await request.json();
     if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
     // Generate password reset link
     const link = await auth.generatePasswordResetLink(email);
-
-    // Optionally: Send custom email via Nodemailer
-    // But Firebase handles it automatically!
 
     return NextResponse.json({ success: true, link }); // link for testing
   } catch (error: any) {
@@ -26,3 +23,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const dynamic = "force-dynamic";

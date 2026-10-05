@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu,
   X,
@@ -12,26 +12,49 @@ import {
   LogOut,
   Settings,
   Mail,
-  PenTool,
   Bell,
+  Phone,
+  ShieldCheck,
+  ChevronRight,
+  Users
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { db } from "../firebaseconfig";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const statsRef = useRef<HTMLDivElement>(null);
-  const inView = useInView(statsRef, { once: true });
 
-  const router = useRouter();
   const { user, isLoggedIn, logout } = useAuth();
   const { theme } = useTheme();
+
+  useEffect(() => {
+    if (user?.uid) {
+      const fetchAvatar = async () => {
+        try {
+          const docRef = doc(db, "customers", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.avatar) {
+              setAvatarUrl(data.avatar);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching avatar in header:", err);
+        }
+      };
+      fetchAvatar();
+    } else {
+      setAvatarUrl(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -53,19 +76,23 @@ export default function Header() {
     await logout();
     setIsProfileOpen(false);
     setIsMenuOpen(false);
-    router.push("/");
+    window.location.href = "/";
   };
 
   const navItems = [
     { name: "Home", href: "/" },
-    { name: "Read Now", href: "/read" },
+    { name: "Find Tutors", href: "/tutors" },
+    { name: "Find Students", href: "/students" },
+    ...(user?.role === "admin" ? [{ name: "Admin Dashboard", href: "/admin/dashboard" }] : []),
   ];
 
   const profileMenuItems = [
-    { name: "Your Profile", href: "/profile", icon: User },
-    { name: "Your Story", href: "/story", icon: PenTool },
+    ...(user?.role === "admin"
+      ? [{ name: "Admin Dashboard", href: "/admin/dashboard", icon: ShieldCheck }]
+      : user?.role === "tutor"
+      ? [{ name: "Tutor Portal", href: "/tutor/dashboard", icon: BookOpen }]
+      : [{ name: "Student Portal", href: "/student/dashboard", icon: User }]),
     { name: "Notifications", href: "/notifications", icon: Bell },
-    { name: "Settings", href: "/settings", icon: Settings },
   ];
 
   const displayName = user?.fullName?.trim()
@@ -78,404 +105,246 @@ export default function Header() {
 
   return (
     <>
-      {/* Subtle Animated Background Blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <motion.div
-          animate={{ x: [0, 100, 0], y: [0, -60, 0] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute top-0 left-0 w-80 h-80 bg-linear-to-br from-blue-400/10 to-teal-500/10 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{ x: [0, -80, 0], y: [0, 80, 0] }}
-          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-0 right-0 w-72 h-72 bg-linear-to-tr from-green-400/10 to-cyan-500/10 rounded-full blur-3xl"
-        />
+      {/* Top Notification Bar */}
+      <div className="bg-amber-600 text-stone-950 text-xs font-semibold py-2 px-4 text-center tracking-wider uppercase">
+        Biruh Tutors | Premier Tutor & Student Connection Platform | VIP Support: +211 920 500 155
       </div>
 
-      <header className="sticky top-0 z-50">
-        <div className={`border-b border-white/20 dark:border-gray-800/50 backdrop-blur-xl ${
-          theme === "light" ? "bg-white/70" : "bg-gray-950/90"
-        } shadow-lg`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              {/* Logo */}
-              <Link href="/" className="flex items-center space-x-2 group">
-                <motion.div
-                  whileHover={{ rotate: 360 }}
-                  transition={{ duration: 0.6 }}
-                  className="p-1 rounded-xl bg-linear-to-br from-blue-500/20 to-teal-500/20 dark:from-yellow-400/20 dark:to-orange-500/20 shadow-md"
-                >
-                  <BookOpen className="h-8 w-8 text-blue-600 dark:text-yellow-400 drop-shadow-sm" />
-                </motion.div>
-                <motion.span
-                  className={`text-2xl font-bold bg-clip-text text-transparent bg-linear-to-r ${
-                    theme === "light"
-                      ? "from-blue-600 via-teal-500 to-green-600"
-                      : "from-yellow-400 via-orange-500 to-pink-500"
-                  }`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  BioHost
-                </motion.span>
-              </Link>
+      <header className="sticky top-0 z-50 bg-stone-950/95 backdrop-blur-md border-b border-stone-800">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-stone-950 font-bold text-xl shadow-lg">
+              BT
+            </div>
+            <div>
+              <span className="text-lg font-serif font-bold tracking-wider text-amber-500 block leading-none">BIRUH TUTORS</span>
+              <span className="text-[10px] tracking-[0.3em] uppercase text-stone-400 block mt-1">Tutor & Student Hub</span>
+            </div>
+          </Link>
 
-              {/* Desktop Nav */}
-              <nav className="hidden md:flex items-center space-x-8">
-                {navItems.map((item) => (
-                  <motion.div
-                    key={item.name}
-                    whileHover={{ scale: 1.1, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative"
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium tracking-wide text-stone-300">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="hover:text-amber-400 transition"
+              >
+                {item.name}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Desktop Right Actions */}
+          <div className="hidden md:flex items-center gap-4">
+            <a
+              href="tel:+211920500155"
+              className="text-xs text-stone-300 hover:text-amber-400 flex items-center gap-1 font-mono"
+            >
+              <Phone className="w-3.5 h-3.5 text-amber-500" /> +211 920 500 155
+            </a>
+
+            {isLoggedIn && user ? (
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-stone-950 font-bold text-base bg-amber-500 ring-2 ring-amber-500/20 shadow-lg overflow-hidden cursor-pointer"
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    avatarLetter
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute right-0 mt-3 w-64 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl bg-stone-900 border border-stone-800 text-stone-100 z-50"
+                    >
+                      <div className="p-4 border-b border-stone-800">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-stone-950 font-bold overflow-hidden">
+                            {avatarUrl ? (
+                              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              avatarLetter
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">{displayName}</p>
+                            <p className="text-xs text-stone-400 capitalize">{user.role}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="py-2">
+                        {profileMenuItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.name}
+                              href={item.href}
+                              onClick={() => setIsProfileOpen(false)}
+                              className="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-stone-800 transition text-stone-300 hover:text-white"
+                            >
+                              <Icon className="w-4 h-4 text-amber-500" />
+                              <span>{item.name}</span>
+                            </Link>
+                          );
+                        })}
+
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-red-950/50 transition text-red-400 cursor-pointer"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/login"
+                  className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-stone-200 border border-stone-800 rounded-xl text-sm font-semibold transition"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl text-sm transition shadow-lg shadow-amber-500/20 flex items-center gap-1.5"
+                >
+                  Get Started <Sparkles className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="flex items-center gap-3 md:hidden" ref={dropdownRef}>
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2 rounded-lg bg-stone-900 text-stone-300 hover:text-white border border-stone-800"
+              aria-label="Toggle menu"
+            >
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Drawer */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm md:hidden"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <motion.div
+                id="mobile-menu-drawer"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", stiffness: 200, damping: 25 }}
+                className="absolute right-0 top-0 h-screen w-3/4 max-w-sm overflow-y-auto p-6 bg-stone-900 border-l border-stone-800 text-stone-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex justify-end mb-6">
+                  <button
+                    onClick={() => setIsMenuOpen(false)}
+                    className="p-2 rounded-lg bg-stone-950 text-stone-300 hover:text-white border border-stone-800"
                   >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {navItems.map((item) => (
                     <Link
+                      key={item.name}
                       href={item.href}
-                      className={`font-medium transition-all duration-300 relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-linear-to-r after:transition-all after:duration-300 hover:after:w-full ${
-                        theme === "light"
-                          ? "text-gray-700 hover:text-blue-600 after:from-blue-600 after:to-teal-500"
-                          : "text-gray-300 hover:text-yellow-400 after:from-yellow-400 after:to-orange-500"
-                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                      className="block py-3 px-3 text-stone-300 hover:text-amber-400 font-medium border-b border-stone-800 transition"
                     >
                       {item.name}
                     </Link>
-                  </motion.div>
-                ))}
+                  ))}
 
-                {/* Desktop Auth */}
-                <div className="flex items-center gap-3">
-                  {isLoggedIn && user ? (
-                    <div className="relative" ref={profileRef}>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setIsProfileOpen(!isProfileOpen)}
-                        className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden shadow-xl bg-linear-to-br from-blue-600 via-teal-500 to-green-600 dark:from-yellow-400 dark:via-orange-500 dark:to-pink-500 ring-2 ring-white/20 dark:ring-gray-700/50"
-                      >
-                        {avatarLetter}
-                      </motion.button>
+                  <div className="pt-4 space-y-3 border-t border-stone-800">
+                    {isLoggedIn && user ? (
+                      <>
+                        <div className="flex items-center gap-3 px-3 py-2">
+                          <div className="w-9 h-9 rounded-full bg-amber-500 flex items-center justify-center text-stone-950 font-bold overflow-hidden">
+                            {avatarUrl ? (
+                              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              avatarLetter
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">{displayName}</p>
+                            <p className="text-xs text-stone-400 capitalize">{user.role}</p>
+                          </div>
+                        </div>
 
-                      <AnimatePresence>
-                        {isProfileOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
-                            className={`absolute right-0 mt-3 w-64 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl border ${
-                              theme === "light"
-                                ? "bg-white/90 border-gray-200/50"
-                                : "bg-gray-950/90 border-gray-800/50"
-                            }`}
-                          >
-                            <div className={`p-4 border-b ${
-                              theme === "light" ? "border-gray-200/50" : "border-gray-800/50"
-                            }`}>
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-teal-500 flex items-center justify-center text-white font-bold">
-                                  {avatarLetter}
-                                </div>
-                                <div>
-                                  <p className={`text-sm font-semibold ${
-                                    theme === "light" ? "text-gray-800" : "text-gray-100"
-                                  }`}>
-                                    {displayName}
-                                  </p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                    <Mail className="w-3 h-3" />
-                                    {user.email}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
+                        {profileMenuItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.name}
+                              href={item.href}
+                              onClick={() => setIsMenuOpen(false)}
+                              className="block py-3 px-3 text-sm font-medium rounded-xl hover:bg-stone-800 transition flex items-center gap-3 text-stone-300"
+                            >
+                              <Icon className="w-4 h-4 text-amber-500" />
+                              <span>{item.name}</span>
+                            </Link>
+                          );
+                        })}
 
-                            <div className="py-2">
-                              {profileMenuItems.map((item) => {
-                                const Icon = item.icon;
-                                return (
-                                  <Link
-                                    key={item.name}
-                                    href={item.href}
-                                    onClick={() => setIsProfileOpen(false)}
-                                    className={`flex items-center gap-3 px-4 py-3 transition-all ${
-                                      theme === "light"
-                                        ? "hover:bg-gray-100"
-                                        : "hover:bg-gray-900/70"
-                                    }`}
-                                  >
-                                    <Icon className={`w-4 h-4 ${
-                                      theme === "light" ? "text-gray-600" : "text-gray-400"
-                                    }`} />
-                                    <span className={`text-sm font-medium ${
-                                      theme === "light" ? "text-gray-800" : "text-gray-100"
-                                    }`}>
-                                      {item.name}
-                                    </span>
-                                  </Link>
-                                );
-                              })}
-
-                              <div className={`px-4 py-3 border-t ${
-                                theme === "light" ? "border-gray-200/50" : "border-gray-800/50"
-                              }`}>
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-sm font-medium ${
-                                    theme === "light" ? "text-gray-700" : "text-gray-100"
-                                  }`}>
-                                    Theme
-                                  </span>
-                                  <ThemeToggle />
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={handleLogout}
-                                className={`w-full flex items-center gap-3 px--4 py-3 transition-all ${
-                                  theme === "light"
-                                    ? "hover:bg-red-50 text-red-600"
-                                    : "hover:bg-red-900/40 text-red-400"
-                                }`}
-                              >
-                                <LogOut className="w-4 h-4" />
-                                <span className="text-sm font-medium">Logout</span>
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  ) : (
-                    <>
-                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left py-3 px-3 text-sm font-medium rounded-xl flex items-center gap-3 text-red-400 hover:bg-red-950/40 transition"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Logout
+                        </button>
+                      </>
+                    ) : (
+                      <div className="space-y-3 pt-2">
                         <Link
                           href="/login"
-                          className={`px-5 py-2.5 rounded-xl font-semibold transition-all duration-300 shadow-sm ${
-                            theme === "light"
-                              ? "bg-gray-100/80 text-gray-800 border border-gray-300/50 hover:bg-gray-200"
-                              : "bg-gray-900 text-gray-300 border border-gray-800/50 hover:bg-gray-800"
-                          }`}
+                          onClick={() => setIsMenuOpen(false)}
+                          className="block w-full text-center py-3 rounded-xl font-semibold bg-stone-950 text-stone-200 border border-stone-800 hover:bg-stone-800 transition"
                         >
                           Login
                         </Link>
-                      </motion.div>
-
-                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                         <Link
                           href="/signup"
-                          className={`px-6 py-2.5 rounded-xl font-semibold text-white flex items-center gap-2 shadow-xl transition-all duration-300 ring-2 ring-white/30 dark:ring-gray-700/40 ${
-                            theme === "light"
-                              ? "bg-linear-to-r from-blue-600 via-teal-500 to-green-600 hover:from-blue-700 hover:via-teal-600 hover:to-green-700"
-                              : "bg-linear-to-r from-yellow-400 via-orange-500 to-pink-500 hover:from-yellow-500 hover:via-orange-600 hover:to-pink-600"
-                          }`}
+                          onClick={() => setIsMenuOpen(false)}
+                          className="block w-full text-center py-3 rounded-xl font-bold bg-amber-500 text-stone-950 hover:bg-amber-400 transition shadow-lg"
                         >
                           Get Started
-                          <Sparkles className="h-4 w-4 animate-pulse" />
                         </Link>
-                      </motion.div>
-                    </>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </nav>
-
-              {/* Mobile Menu Button */}
-              <div className="flex items-center gap-3 md:hidden" ref={dropdownRef}>
-                <button
-                  onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className={`p-2 rounded-lg transition-all ${
-                    theme === "light"
-                      ? "bg-gray-100/60 hover:bg-gray-200"
-                      : "bg-gray-900 hover:bg-gray-800"
-                  }`}
-                  aria-label="Toggle menu"
-                >
-                  {isMenuOpen ? (
-                    <X className={`h-6 w-6 ${theme === "light" ? "text-gray-700" : "text-gray-300"}`} />
-                  ) : (
-                    <Menu className={`h-6 w-6 ${theme === "light" ? "text-gray-700" : "text-gray-300"}`} />
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile Drawer */}
-          <AnimatePresence>
-            {isMenuOpen && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <motion.div
-                  id="mobile-menu-drawer"
-                  initial={{ x: "100%" }}
-                  animate={{ x: 0 }}
-                  exit={{ x: "100%" }}
-                  transition={{ type: "spring", stiffness: 200, damping: 25 }}
-                  className={`absolute right-0 top-0 h-screen w-3/4 max-w-sm overflow-y-auto p-6 backdrop-blur-xl border-l ${
-                    theme === "light"
-                      ? "bg-white/90 border-gray-200/50"
-                      : "bg-gray-950/90 border-gray-800/50"
-                  }`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex justify-end mb-4">
-                    <button
-                      onClick={() => setIsMenuOpen(false)}
-                      className={`p-2 rounded-lg transition-all ${
-                        theme === "light"
-                          ? "bg-gray-100 hover:bg-gray-200"
-                          : "bg-gray-900 hover:bg-gray-800"
-                      }`}
-                    >
-                      <X className={`h-6 w-6 ${theme === "light" ? "text-gray-700" : "text-gray-300"}`} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {navItems.map((item, index) => (
-                      <motion.div
-                        key={item.name}
-                        initial={{ x: 30, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        transition={{ delay: index * 0.05 + 0.1, type: "spring", stiffness: 150 }}
-                      >
-                        <Link
-                          href={item.href}
-                          onClick={() => setIsMenuOpen(false)}
-                          className={`block py-3 px-2 font-medium transition-all duration-300 hover:translate-x-1 border-b ${
-                            theme === "light"
-                              ? "text-gray-700 hover:text-blue-600 border-gray-100"
-                              : "text-gray-300 hover:text-yellow-400 border-gray-800"
-                          }`}
-                        >
-                          {item.name}
-                        </Link>
-                      </motion.div>
-                    ))}
-
-                    <motion.div
-                      initial={{ x: 30, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      transition={{ delay: 0.3 }}
-                      className={`pt-4 space-y-3 border-t ${
-                        theme === "light" ? "border-gray-200" : "border-gray-800"
-                      }`}
-                    >
-                      {isLoggedIn && user ? (
-                        <>
-                          <div className="flex items-center gap-3 px-2 py-3">
-                            <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-teal-500 flex items-center justify-center text-white text-sm font-bold">
-                              {avatarLetter}
-                            </div>
-                            <div>
-                              <p className={`text-sm font-semibold ${
-                                theme === "light" ? "text-gray-800" : "text-gray-100"
-                              }`}>
-                                {displayName}
-                              </p>
-                            </div>
-                          </div>
-
-                          {profileMenuItems.map((item) => {
-                            const Icon = item.icon;
-                            return (
-                              <Link
-                                key={item.name}
-                                href={item.href}
-                                onClick={() => setIsMenuOpen(false)}
-                                className={`block w-full text-left py-3 px-2 text-sm font-medium rounded-lg flex items-center gap-3 transition-all ${
-                                  theme === "light"
-                                    ? "hover:bg-gray-100"
-                                    : "hover:bg-gray-900/70"
-                                }`}
-                              >
-                                <Icon className={`w-4 h-4 ${
-                                  theme === "light" ? "text-gray-600" : "text-gray-400"
-                                }`} />
-                                <span className={theme === "light" ? "text-gray-800" : "text-gray-100"}>
-                                  {item.name}
-                                </span>
-                              </Link>
-                            );
-                          })}
-
-                          <div className={`flex items-center justify-between px-2 py-3 border-t ${
-                            theme === "light" ? "border-gray-100" : "border-gray-800"
-                          }`}>
-                            <span className={`text-sm font-medium ${
-                              theme === "light" ? "text-gray-700" : "text-gray-100"
-                            }`}>
-                              Theme
-                            </span>
-                            <ThemeToggle />
-                          </div>
-
-                          <button
-                            onClick={handleLogout}
-                            className={`w-full text-left py-3 px-2 text-sm font-medium rounded-lg flex items-center gap-3 transition-all ${
-                              theme === "light"
-                                ? "text-red-600 hover:bg-red-50"
-                                : "text-red-400 hover:bg-red-900/40"
-                            }`}
-                          >
-                            <LogOut className="w-4 h-4" />
-                            Logout
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <Link
-                            href="/login"
-                            onClick={() => setIsMenuOpen(false)}
-                            className={`block w-full text-center py-3.5 rounded-xl font-semibold transition-all duration-300 ${
-                              theme === "light"
-                                ? "bg-gray-700 text-white border border-gray-300/50 hover:bg-gray-600"
-                                : "bg-gray-900 text-gray-300 border border-gray-800/50 hover:bg-gray-800"
-                            }`}
-                          >
-                            Login
-                          </Link>
-
-                          <Link
-                            href="/signup"
-                            onClick={() => setIsMenuOpen(false)}
-                            className={`block w-full text-center py-3.5 rounded-xl font-semibold text-white flex items-center justify-center gap-2 shadow-lg transition-all duration-300 ring-2 ring-white/30 dark:ring-gray-700/40 ${
-                              theme === "light"
-                                ? "bg-linear-to-r from-blue-600 via-teal-500 to-green-600 hover:from-blue-700 hover:via-teal-600 hover:to-green-700"
-                                : "bg-linear-to-r from-yellow-400 via-orange-500 to-pink-500 hover:from-yellow-500 hover:via-orange-600 hover:to-pink-600"
-                            }`}
-                          >
-                            Get Started
-                            <Sparkles className="h-4 w-4 animate-pulse" />
-                          </Link>
-                        </>
-                      )}
-                    </motion.div>
-                  </div>
-                </motion.div>
               </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Floating CTA */}
-        <motion.a
-          href="/dashboard"
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-linear-to-r from-indigo-600 to-purple-600 dark:from-indigo-500 dark:to-purple-500 text-white px-5 py-3 rounded-full shadow-2xl font-semibold text-sm backdrop-blur-xl border border-white/20"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 1 }}
-        >
-          Dashboard
-        </motion.a>
-
-       
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
     </>
   );

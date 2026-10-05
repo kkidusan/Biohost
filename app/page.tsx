@@ -1,497 +1,240 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
-import {
-  BookOpen,
-  Server,
-  User,
-  Share2,
-  Star,
-  Zap,
-  Shield,
-  ArrowRight,
-  Sparkles,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useAuth } from "./context/AuthContext";
-import { useTheme } from "./context/ThemeContext"; // Added theme context import
+import React, { useState } from "react";
 import Link from "next/link";
+import {
+  Calendar,
+  Users,
+  MapPin,
+  Phone,
+  Mail,
+  Star,
+  Wifi,
+  Coffee,
+  Tv,
+  Bath,
+  CheckCircle,
+  Menu,
+  X,
+  ChevronRight,
+  Sparkles,
+  Utensils,
+  Shield,
+  BookOpen,
+  Search,
+  Lock,
+  Clock,
+  Video
+} from "lucide-react";
+import { initialTutors } from "./lib/platformData";
 
 export default function Home() {
-  // Use Contexts
-  const { isLoggedIn } = useAuth();
-  const { theme } = useTheme(); // Get the current theme to enable dynamic color selection
-
-  const [stats, setStats] = useState({ bios: 0, users: 0, stories: 0 });
-
-  // Define service data with dual-mode gradients
-  const services = [
-    {
-      title: "Biography Creation",
-      slug: "biography-creation",
-      description:
-        "Craft compelling life stories with AI-powered writing and human refinement.",
-      icon: BookOpen,
-      color: "from-blue-500 to-purple-600", // Light mode gradient
-      darkColor: "from-blue-400 to-purple-500", // Dark mode gradient
-    },
-    {
-      title: "Secure Hosting",
-      slug: "secure-hosting",
-      description:
-        "Host your biography on enterprise-grade, encrypted, global servers.",
-      icon: Server,
-      color: "from-green-500 to-teal-600",
-      darkColor: "from-emerald-400 to-cyan-500",
-    },
-    {
-      title: "Customization",
-      slug: "customization",
-      description:
-        "Personalize every pixel with themes, media, and interactive elements.",
-      icon: User,
-      color: "from-purple-500 to-pink-600",
-      darkColor: "from-violet-400 to-pink-500",
-    },
-    {
-      title: "Easy Sharing",
-      slug: "easy-sharing",
-      description:
-        "Share instantly with QR, embeds, social, and track engagement.",
-      icon: Share2,
-      color: "from-orange-500 to-red-600",
-      darkColor: "from-orange-400 to-rose-500",
-    },
-  ];
-
-  const testimonials = [
-    {
-      quote: "Transformed my family history into a beautiful online legacy!",
-      author: "Jane Doe",
-      role: "Author & Grandmother",
-      rating: 5,
-    },
-    {
-      quote: "Professional hosting with zero downtime. Highly recommend!",
-      author: "John Smith",
-      role: "Entrepreneur",
-      rating: 5,
-    },
-    {
-      quote: "The customization options are endless. My bio looks stunning!",
-      author: "Maria Garcia",
-      role: "Artist",
-      rating: 5,
-    },
-  ];
-
-  // Stats Counter Logic
-  const statsRef = useRef<HTMLDivElement>(null);
-  const inView = useInView(statsRef, { once: true });
-
-  useEffect(() => {
-    if (inView) {
-      const interval = setInterval(() => {
-        setStats((s) => ({
-          // Ensures we stop exactly at the target numbers (10500, 3200, 8500)
-          bios: s.bios < 10500 ? Math.min(10500, s.bios + 137) : 10500, 
-          users: s.users < 3200 ? Math.min(3200, s.users + 41) : 3200,
-          stories: s.stories < 8500 ? Math.min(8500, s.stories + 112) : 8500,
-        }));
-      }, 30);
-      return () => clearInterval(interval);
-    }
-  }, [inView]);
+  const [subjectQuery, setSubjectQuery] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState("All");
 
   return (
-    <div className="min-h-screen">
-      {/* Floating CTA - ONLY FOR GUESTS */}
-      {!isLoggedIn && (
-        <motion.a
-          href="/signup"
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 text-white px-5 py-3 rounded-full shadow-2xl font-semibold text-sm md:text-base backdrop-blur-xl border border-white/20"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 1 }}
-        >
-          Start Free <Sparkles className="h-4 w-4 animate-pulse" />
-        </motion.a>
-      )}
-
-      {/* HERO SECTION */}
-      <section className="relative overflow-hidden py-24 px-4">
-        {/* Background Animation Blobs */}
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20 dark:from-blue-500/10 dark:via-purple-500/10 dark:to-pink-500/10 blur-3xl">
-          <motion.div
-            animate={{ x: [0, 100, 0], y: [0, -100, 0] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-br from-blue-400/30 to-purple-500/30 rounded-full blur-3xl"
+    <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-amber-500 selection:text-stone-950">
+      {/* Hero Section */}
+      <section className="relative min-h-[85vh] flex items-center justify-center text-center px-6 overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=2000&q=85"
+            alt="BioHost Tutors"
+            className="w-full h-full object-cover object-center filter brightness-40 scale-105 animate-pulse duration-[10000ms]"
           />
-          <motion.div
-            animate={{ x: [0, -150, 0], y: [0, 100, 0] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-            className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-tr from-pink-400/30 to-orange-500/30 rounded-full blur-3xl"
-          />
+          <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-black/70" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="mb-6"
-          >
-            <span className="inline-block px-4 py-1 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/30 text-sm font-medium text-white shadow-md">
-              <Zap className="inline h-4 w-4 mr-1" />
-              Trusted by 3,200+ storytellers
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 drop-shadow-lg"
-          >
-            {isLoggedIn ? "Your Legacy, Live" : "Host Your Life Story"}
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="text-xl md:text-2xl mb-10 max-w-4xl mx-auto text-gray-700 dark:text-gray-200"
-          >
-            {isLoggedIn
-              ? "Your biography is live, secure, and ready to share with the world."
-              : "Create, customize, and share professional biographies with secure hosting."}
-          </motion.p>
-
-          {/* CTA BUTTONS */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-          >
-            {!isLoggedIn && (
-              <motion.a
-                href="/signup"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 rounded-full text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 shadow-xl backdrop-blur-xl border border-white/20 flex items-center justify-center gap-2 transition duration-300"
-              >
-                Get Started <ArrowRight className="h-5 w-5" />
-              </motion.a>
-            )}
-            {isLoggedIn && (
-              <motion.a
-                href="/profile"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 rounded-full text-lg font-semibold text-white bg-gradient-to-r from-pink-600 to-orange-600 dark:from-pink-500 dark:to-orange-500 shadow-xl backdrop-blur-xl border border-white/20 flex items-center justify-center gap-2 transition duration-300"
-              >
-                View My Bio <BookOpen className="h-5 w-5" />
-              </motion.a>
-            )}
-            {/* Secondary CTA */}
-            <motion.a
-              href="/pricing"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 rounded-full text-lg font-semibold text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 backdrop-blur-xl flex items-center justify-center gap-2 shadow-inner transition duration-300"
-            >
-              View Pricing
-            </motion.a>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* LIVE STATS */}
-      <section className="py-16 px-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl border-y border-gray-200/50 dark:border-gray-700/50">
-        <div className="max-w-7xl mx-auto">
-          <div ref={statsRef} className="grid grid-cols-3 gap-8 text-center">
-            {[
-              { label: "Bios Hosted", value: stats.bios, suffix: "+" },
-              { label: "Happy Users", value: stats.users, suffix: "+" },
-              { label: "Active Stories", value: stats.stories, suffix: "+" },
-            ].map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ delay: i * 0.2 }}
-              >
-                <div className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
-                  {stat.value.toLocaleString()}
-                  {stat.suffix}
-                </div>
-                <p className="mt-2 text-gray-600 dark:text-gray-300 font-medium">
-                  {stat.label}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SERVICES */}
-      <section className="py-24 px-4">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-600 dark:from-gray-100 dark:to-gray-300">
-              Everything You Need
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              From creation to global sharing — all in one platform.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {services.map((s, i) => {
-              const Icon = s.icon;
-              // Dynamically select the gradient class based on the current theme state
-              const gradientClass =
-                theme === "dark" ? s.darkColor : s.color;
-              
-              return (
-                <motion.div
-                  key={s.slug}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: i * 0.1 }}
-                  whileHover={{ y: -8, scale: 1.02 }}
-                  className="group relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden cursor-pointer"
-                >
-                  <Link
-                    href={`/learn?service=${s.slug}`}
-                    className="absolute inset-0 z-10" // Make the whole card clickable
-                  >
-                    <span className="sr-only">
-                      Learn more about {s.title}
-                    </span>
-                  </Link>
-
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div
-                    // Use the dynamic gradient class
-                    className={`p-3 rounded-xl mb-4 w-fit bg-gradient-to-r ${gradientClass} shadow-lg relative z-20`}
-                  >
-                    <Icon className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 relative z-20">
-                    {s.title}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed relative z-20">
-                    {s.description}
-                  </p>
-
-                  <motion.div
-                    className="mt-5 relative z-20"
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                  >
-                    <div className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-semibold text-sm hover:gap-2.5 transition-all duration-200">
-                      Read more
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </div>
-                  </motion.div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section className="py-24 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Animated background stars/blobs */}
-          <motion.div
-            animate={{ x: [0, 100, 0], y: [0, -50, 0] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-purple-600/20 rounded-full blur-3xl"
-          />
-          <motion.div
-            animate={{ x: [0, -80, 0], y: [0, 60, 0] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-            className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-tr from-pink-400/20 to-orange-500/20 rounded-full blur-3xl"
-          />
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-5xl md:text-6xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 drop-shadow-lg">
-              Loved by Storytellers Worldwide
-            </h2>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 font-medium">
-              Real voices. Real legacies. Real impact.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((t, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 40, rotateX: -15 }}
-                whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-                viewport={{ once: true }}
-                transition={{
-                  duration: 0.7,
-                  delay: i * 0.15,
-                  type: "spring",
-                  stiffness: 80,
-                }}
-                whileHover={{
-                  y: -12,
-                  rotateX: 5,
-                  rotateY: 5,
-                  scale: 1.03,
-                }}
-                className="group relative"
-                style={{ transformStyle: "preserve-3d" }}
-              >
-                {/* Hover Glow Effect */}
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-3xl blur opacity-0 group-hover:opacity-100 transition duration-500" />
-                
-                <div className="relative h-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 dark:border-gray-700/50 overflow-hidden">
-                  
-                  {/* Internal Animated Stars */}
-                  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    {[...Array(6)].map((_, s) => (
-                      <motion.div
-                        key={s}
-                        animate={{
-                          y: [0, -20, 0],
-                          opacity: [0.3, 1, 0.3],
-                          scale: [1, 1.3, 1],
-                        }}
-                        transition={{
-                          duration: 3 + s * 0.5,
-                          repeat: Infinity,
-                          delay: s * 0.3,
-                        }}
-                        className="absolute"
-                        style={{
-                          top: `${20 + s * 15}%`,
-                          left: `${10 + s * 12}%`,
-                        }}
-                      >
-                        <Star className="h-3 w-3 text-yellow-400 fill-current opacity-60" />
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* Rating Stars */}
-                  <div className="flex items-center mb-5">
-                    {[...Array(t.rating)].map((_, j) => (
-                      <motion.div
-                        key={j}
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.5 + j * 0.05 }}
-                      >
-                        <Star className="h-6 w-6 text-yellow-400 fill-current drop-shadow-md" />
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  <p className="text-lg md:text-xl font-medium text-gray-700 dark:text-white italic mb-6 leading-relaxed relative z-10">
-                    "{t.quote}"
-                  </p>
-
-                  <div className="flex items-center gap-3">
-                    {/* Author Avatar Placeholder */}
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500 p-0.5 shadow-md">
-                      <div className="w-full h-full rounded-full bg-white dark:bg-gray-800 flex items-center justify-center">
-                        <User className="h-6 w-6 text-blue-600 dark:text-yellow-400" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900 dark:text-white text-lg">
-                        {t.author}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {t.role}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Separator */}
-                <motion.div
-                  className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                  initial={{ scaleX: 0 }}
-                  whileHover={{ scaleX: 1 }}
-                  transition={{ duration: 0.4 }}
-                />
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.6 }}
-            className="flex justify-center gap-8 mt-16 flex-wrap"
-          >
-            {["SSL Secured", "GDPR Compliant", "99.9% Uptime", "24/7 Support"].map(
-              (badge, i) => (
-                <motion.div
-                  key={i}
-                  whileHover={{ scale: 1.1 }}
-                  className="px-4 py-2 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/30 text-sm font-medium text-gray-700 dark:text-white shadow-md transition duration-300 cursor-default"
-                >
-                  {badge}
-                </motion.div>
-              )
-            )}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* FINAL CTA */}
-      <section className="py-20 px-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          className="max-w-4xl mx-auto text-center bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 rounded-3xl p-10 shadow-2xl backdrop-blur-xl border border-white/20"
-        >
-          <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            {isLoggedIn ? "Keep Sharing Your Story" : "Ready to Share Your Story?"}
-          </h3>
-          <p className="text-white/90 mb-8 text-lg">
-            {isLoggedIn
-              ? "Your legacy is live. Keep sharing and inspiring."
-              : "Join thousands who’ve preserved their legacy with BioHost."}
+        <div className="relative z-10 max-w-4xl mx-auto space-y-6 mt-12">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-bold tracking-tight text-white leading-tight">
+            Connect With Expert Tutors, <span className="text-amber-500 italic">Elevate Learning</span>
+          </h1>
+          <p className="text-stone-300 text-lg md:text-xl max-w-2xl mx-auto font-light leading-relaxed">
+            Biruh Tutors is the premier integration agent connecting elite professional tutors with ambitious students. Secure escrow bookings, 1-on-1 mentorship, and guaranteed academic excellence.
           </p>
-          <motion.a
-            href={isLoggedIn ? "/share" : "/signup"}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-white text-blue-600 dark:text-blue-600 font-bold text-lg shadow-lg hover:shadow-xl transition duration-300"
-          >
-            {isLoggedIn ? "Share Now" : "Get Started Now"} <Shield className="h-5 w-5" />
-          </motion.a>
-        </motion.div>
+
+          {/* Quick Search & Filter Bar */}
+          <div className="mt-10 bg-stone-900/90 backdrop-blur-md border border-stone-800 p-4 md:p-6 rounded-2xl shadow-2xl max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-stone-400 font-semibold mb-1.5 flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5 text-amber-500" /> Subject or Tutor
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Mathematics, Physics..."
+                value={subjectQuery}
+                onChange={(e) => setSubjectQuery(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2.5 text-sm text-stone-200 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-stone-400 font-semibold mb-1.5 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-amber-500" /> Grade Level
+              </label>
+              <select
+                value={selectedGrade}
+                onChange={(e) => setSelectedGrade(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2.5 text-sm text-stone-200 focus:outline-none focus:border-amber-500"
+              >
+                <option value="All">All Levels</option>
+                <option value="Elementary">Elementary</option>
+                <option value="Middle School">Middle School</option>
+                <option value="High School / College">High School / College</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Link
+                href={`/tutors?search=${encodeURIComponent(subjectQuery)}`}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-2.5 px-4 rounded-lg transition text-center shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 text-sm"
+              >
+                <span>Find Expert Tutors</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
+
+      {/* Featured Tutors Section */}
+      <section className="py-24 px-6 max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+          <span className="text-amber-500 text-xs font-semibold tracking-widest uppercase">Elite Mentors</span>
+          <h2 className="text-3xl md:text-5xl font-serif font-bold text-white">Featured Expert Tutors</h2>
+          <p className="text-stone-400 font-light">
+            Verified academic leaders ready to guide students toward exceptional results.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {initialTutors.slice(0, 3).map((tutor) => (
+            <div
+              key={tutor.id}
+              className="bg-stone-900 border border-stone-800 rounded-2xl overflow-hidden shadow-xl hover:border-amber-500/50 transition group flex flex-col justify-between"
+            >
+              <div>
+                <div className="relative h-64 overflow-hidden">
+                  <img
+                    src={tutor.avatar}
+                    alt={tutor.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  />
+                  <div className="absolute top-4 right-4 bg-stone-950/80 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-amber-400 border border-stone-700">
+                    ${tutor.hourlyRate} <span className="text-stone-400 font-normal">/ hour</span>
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between text-xs text-stone-400 font-medium">
+                    <span className="bg-amber-500/10 text-amber-400 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                      {tutor.subject}
+                    </span>
+                    <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                      <Star className="w-3.5 h-3.5 fill-amber-400" /> {tutor.rating}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition">
+                    {tutor.name}
+                  </h3>
+                  <p className="text-stone-400 text-sm font-light line-clamp-2">
+                    {tutor.bio}
+                  </p>
+                  <div className="text-xs text-stone-500 pt-2 border-t border-stone-800 flex justify-between">
+                    <span>{tutor.location}</span>
+                    <span>{tutor.learningMode}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 pt-0">
+                <Link
+                  href={`/tutors/${tutor.id}`}
+                  className="w-full py-3 bg-stone-800 hover:bg-amber-500 hover:text-stone-950 text-stone-200 font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2"
+                >
+                  <span>View Profile & Book Session</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Link
+            href="/tutors"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-stone-900 border border-stone-800 hover:border-amber-500 text-stone-200 font-semibold rounded-full transition shadow-xl"
+          >
+            <span>Browse All Tutors</span>
+            <ChevronRight className="w-4 h-4 text-amber-500" />
+          </Link>
+        </div>
+      </section>
+
+      {/* Platform Features */}
+      <section className="py-24 px-6 bg-stone-900/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+            <span className="text-amber-500 text-xs font-semibold tracking-widest uppercase">Why Choose Biruh Tutors</span>
+            <h2 className="text-3xl md:text-5xl font-serif font-bold text-white">Built for Security & Excellence</h2>
+            <p className="text-stone-400 font-light">
+              Connecting students and tutors through secure escrow payments and verified credentials.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: <Shield className="w-6 h-6 text-amber-500" />,
+                title: "Verified Credentials",
+                desc: "Every tutor undergoes rigorous ID verification and academic background checks."
+              },
+              {
+                icon: <Lock className="w-6 h-6 text-amber-500" />,
+                title: "Escrow Protection",
+                desc: "Funds are held securely in escrow and only released after successful lesson completion."
+              },
+              {
+                icon: <Video className="w-6 h-6 text-amber-500" />,
+                title: "Virtual Classroom",
+                desc: "High-definition video rooms with interactive whiteboards for seamless online sessions."
+              },
+              {
+                icon: <Clock className="w-6 h-6 text-amber-500" />,
+                title: "Flexible Scheduling",
+                desc: "Real-time calendar slot booking and instant confirmation with 24/7 support."
+              },
+            ].map((feat, idx) => (
+              <div key={idx} className="bg-stone-900 border border-stone-800 p-8 rounded-2xl hover:border-amber-500/40 transition space-y-4">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                  {feat.icon}
+                </div>
+                <h3 className="text-xl font-serif font-bold text-white">{feat.title}</h3>
+                <p className="text-stone-400 text-sm font-light leading-relaxed">{feat.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-stone-950 border-t border-stone-900 py-12 px-6 text-stone-400 text-sm">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-stone-950 font-bold text-lg">
+              BT
+            </div>
+            <div>
+              <span className="font-serif font-bold text-white tracking-wider block leading-none">BIRUH TUTORS</span>
+              <span className="text-[10px] text-stone-500 block mt-1">Tutor & Student Connection Agent</span>
+            </div>
+          </div>
+          <p className="text-xs text-stone-500 text-center">
+            © {new Date().getFullYear()} Biruh Tutors. Secure Escrow Tutoring Platform. Phone: +211 920 500 155.
+          </p>
+          <div className="flex items-center gap-6 text-xs font-medium">
+            <Link href="/tutors" className="hover:text-amber-400 transition">Find Tutors</Link>
+            <Link href="/student/dashboard" className="hover:text-amber-400 transition">Student Portal</Link>
+            <a href="tel:+211920500155" className="text-amber-400 transition">Front Desk</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

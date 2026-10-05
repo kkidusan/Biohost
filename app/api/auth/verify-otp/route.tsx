@@ -1,9 +1,7 @@
 // app/api/auth/verify-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { initAdmin, getAdminDb } from "../../../lib/admin";
-
-initAdmin();
-const adminDb = getAdminDb();
+import { db } from "../../../firebaseconfig";
+import { collection, query, where, getDocs, updateDoc } from "firebase/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,12 +16,13 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    const snapshot = await adminDb
-      .collection("otps")
-      .where("email", "==", normalizedEmail)
-      .where("otp", "==", otp)
-      .where("used", "==", false)
-      .get();
+    const q = query(
+      collection(db, "otps"),
+      where("email", "==", normalizedEmail),
+      where("otp", "==", otp),
+      where("used", "==", false)
+    );
+    const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
       return NextResponse.json(
@@ -32,8 +31,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const doc = snapshot.docs[0];
-    const data = doc.data();
+    const docSnap = snapshot.docs[0];
+    const data = docSnap.data();
 
     // Check expiry
     if (data.expiresAt.toDate() < new Date()) {
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark as used
-    await doc.ref.update({ used: true });
+    await updateDoc(docSnap.ref, { used: true });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

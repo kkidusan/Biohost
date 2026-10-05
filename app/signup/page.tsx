@@ -1,9 +1,10 @@
-// app/register/page.tsx
+// app/signup/page.tsx
 "use client";
 
-import { useState, useEffect, useContext, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth, googleProvider, db } from "../firebaseconfig";
+import Link from "next/link";
+import { auth, googleProvider, db, formatFirebaseError } from "../firebaseconfig";
 import {
   signInWithPopup,
   fetchSignInMethodsForEmail,
@@ -18,18 +19,18 @@ import {
   EyeOff,
   Loader2,
   CheckCircle,
+  BookOpen,
 } from "lucide-react";
-import { motion, AnimatePresence, useInView } from "framer-motion";
-import { useTheme } from "../context/ThemeContext";
+import { motion, AnimatePresence } from "framer-motion";
 import zxcvbn from "zxcvbn";
-import { query, collection, where, getDocs } from "firebase/firestore";
+import { query, collection, where, getDocs, doc, setDoc } from "firebase/firestore";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { theme } = useTheme();
   const [stage, setStage] = useState<
     "email" | "otp" | "details" | "google-otp" | "google-details"
   >("email");
+  const [role, setRole] = useState<"student" | "tutor">("student");
 
   // Manual flow
   const [email, setEmail] = useState("");
@@ -53,9 +54,6 @@ export default function RegisterPage() {
   const [resendTimer, setResendTimer] = useState(0);
   const [error, setError] = useState("");
   const [passwordStrength, setPasswordStrength] = useState(0);
-
-  const statsRef = useRef<HTMLDivElement>(null);
-  const inView = useInView(statsRef, { once: true });
 
   // Password strength
   useEffect(() => {
@@ -156,22 +154,18 @@ export default function RegisterPage() {
       if (!snap.empty) throw new Error("Email in use");
 
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      const idToken = await cred.user.getIdToken();
+      const uid = cred.user.uid;
 
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ email, fullName }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Signup failed");
+      await setDoc(doc(db, "customers", uid), {
+        email: email.trim(),
+        fullName: fullName.trim(),
+        role,
+        createdAt: new Date().toISOString(),
+      }, { merge: true });
 
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch (e: any) {
-      setError(e.message);
+      setError(formatFirebaseError(e));
     } finally {
       setRegisterLoading(false);
     }
@@ -215,437 +209,372 @@ export default function RegisterPage() {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("No user");
+      const uid = user.uid;
 
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ email: googleEmail, fullName: googleName }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Signup failed");
+      await setDoc(doc(db, "customers", uid), {
+        email: googleEmail.trim(),
+        fullName: googleName.trim(),
+        role,
+        createdAt: new Date().toISOString(),
+      }, { merge: true });
 
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch (e: any) {
-      setError(e.message);
+      setError(formatFirebaseError(e));
     } finally {
       setRegisterLoading(false);
     }
   };
 
   return (
-    <>
-      {/* Animated Background Blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <motion.div
-          animate={{ x: [0, 120, 0], y: [0, -80, 0] }}
-          transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
-          className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-br from-indigo-400/20 to-purple-500/20 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{ x: [0, -100, 0], y: [0, 100, 0] }}
-          transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-tr from-pink-400/20 to-orange-500/20 rounded-full blur-3xl"
-        />
-      </div>
-
-      <main
-        className={`min-h-screen flex items-center justify-center p-6 ${
-          theme === "light"
-            ? "bg-gradient-to-br from-indigo-50/50 via-purple-50/50 to-pink-50/50"
-            : "bg-gradient-to-br from-gray-900 via-purple-950 to-indigo-950"
-        }`}
+    <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-amber-500 selection:text-stone-950 flex items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md p-8"
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className={`w-full max-w-md rounded-3xl shadow-2xl p-8 backdrop-blur-2xl border border-white/30 dark:border-gray-700/50 ${
-            theme === "light" ? "bg-white/80" : "bg-gray-800/80"
-          }`}
-          whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: "spring", stiffness: 300 }}
-        >
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ y: -20 }}
-              animate={{ y: 0 }}
-              className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 mb-4 shadow-lg"
-            >
-              <Lock className="w-8 h-8 text-white" />
-            </motion.div>
-            <h1 className={`text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${
-              theme === "light" ? "from-indigo-600 to-purple-600" : "from-indigo-400 to-purple-400"
-            }`}>
-              Create Account
-            </h1>
-            <p className={`mt-2 text-sm ${theme === "light" ? "text-gray-600" : "text-gray-400"}`}>
-              Secure signup with OTP
-            </p>
+        <div className="text-center mb-8 space-y-2">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 mb-2 shadow-lg">
+            <Lock className="w-7 h-7" />
           </div>
+          <h1 className="text-3xl font-serif font-bold text-white">Create Account</h1>
+          <p className="text-stone-400 text-sm font-light">
+            Secure verification with OTP & Escrow
+          </p>
+        </div>
 
-          <AnimatePresence mode="wait">
-            {/* === EMAIL STAGE (Manual) === */}
-            {stage === "email" && (
-              <motion.div
-                key="email"
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 50 }}
-                className="space-y-6"
-              >
-                <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className={`w-full pl-12 pr-4 py-4 rounded-xl border-2 transition-all backdrop-blur ${
-                      theme === "light"
-                        ? "bg-white/70 border-gray-200 focus:border-indigo-500"
-                        : "bg-gray-700/70 border-gray-600 focus:border-purple-500 text-white"
-                    } outline-none focus:ring-2 focus:ring-indigo-500/20`}
-                  />
-                </div>
-
-                {error && (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-sm text-center">
-                    {error}
-                  </motion.p>
-                )}
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => sendOtp(email)}
-                  disabled={otpLoading || !email}
-                  className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
-                >
-                  {otpLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Send OTP"}
-                </motion.button>
-
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className={`${theme === "light" ? "bg-white/80 text-gray-500" : "bg-gray-800/80 text-gray-400"} px-2 backdrop-blur`}>
-                      Or
-                    </span>
-                  </div>
-                </div>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleGoogle}
-                  disabled={googleLoading}
-                  className={`w-full py-4 border-2 rounded-xl font-medium flex items-center justify-center gap-3 transition-all backdrop-blur ${
-                    theme === "light"
-                      ? "border-gray-300 bg-white/70 hover:bg-white/90"
-                      : "border-gray-600 bg-gray-700/70 hover:bg-gray-600/90 text-white"
-                  }`}
-                >
-                  {googleLoading ? (
-                    <Loader2 className="animate-spin h-5 w-5" />
-                  ) : (
-                    <>
-                      <FcGoogle className="w-6 h-6" />
-                      Continue with Google
-                    </>
-                  )}
-                </motion.button>
-
-                <p className="text-center text-sm">
-                  Already have an account?{" "}
-                  <a href="/login" className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
-                    Log in
-                  </a>
-                </p>
-              </motion.div>
-            )}
-
-            {/* === OTP STAGE (Manual) === */}
-            {stage === "otp" && (
-              <motion.div
-                key="otp"
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 50 }}
-                className="space-y-6"
-              >
-                <div className="text-center">
-                  <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-3" />
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    OTP sent to <strong>{email}</strong>
-                  </p>
-                </div>
-
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  placeholder="000000"
-                  className="w-full text-center text-3xl font-mono tracking-widest py-4 rounded-xl border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 outline-none backdrop-blur bg-white/70 dark:bg-gray-700/70"
-                />
-
-                {error && (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-sm text-center">
-                    {error}
-                  </motion.p>
-                )}
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => verifyOtp(email, otp)}
-                  disabled={verifyLoading || otp.length !== 6}
-                  className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
-                >
-                  {verifyLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Verify OTP"}
-                </motion.button>
-
-                <p className="text-center text-sm">
-                  {resendTimer > 0 ? (
-                    `Resend in ${resendTimer}s`
-                  ) : (
-                    <button
-                      onClick={() => sendOtp(email)}
-                      className="text-indigo-600 dark:text-indigo-400 underline"
-                      disabled={otpLoading}
-                    >
-                      Resend OTP
-                    </button>
-                  )}
-                </p>
-              </motion.div>
-            )}
-
-            {/* === DETAILS STAGE (Manual) === */}
-            {stage === "details" && (
-              <motion.form
-                key="details"
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 50 }}
-                onSubmit={handleManualRegister}
-                className="space-y-5"
-              >
-                <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Full Name"
-                    className={`w-full pl-12 pr-4 py-4 rounded-xl border-2 transition-all backdrop-blur ${
-                      theme === "light"
-                        ? "bg-white/70 border-gray-200 focus:border-indigo-500"
-                        : "bg-gray-700/70 border-gray-600 focus:border-purple-500 text-white"
-                    } outline-none focus:ring-2 focus:ring-indigo-500/20`}
-                  />
-                </div>
-
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password"
-                    className={`w-full pl-12 pr-12 py-4 rounded-xl border-2 transition-all backdrop-blur ${
-                      theme === "light"
-                        ? "bg-white/70 border-gray-200 focus:border-indigo-500"
-                        : "bg-gray-700/70 border-gray-600 focus:border-purple-500 text-white"
-                    } outline-none focus:ring-2 focus:ring-indigo-500/20`}
-                  />
+        <AnimatePresence mode="wait">
+          {/* === EMAIL STAGE (Manual) === */}
+          {stage === "email" && (
+            <motion.div
+              key="email"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}
+              className="space-y-6"
+            >
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-stone-400 font-semibold mb-2">
+                  I want to register as <span className="text-amber-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2"
+                    onClick={() => setRole("student")}
+                    className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold flex items-center justify-center gap-2 transition ${
+                      role === "student"
+                        ? "border-amber-500 bg-amber-500/10 text-amber-400 shadow-lg"
+                        : "border-stone-800 bg-stone-900 text-stone-400 hover:text-white"
+                    }`}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5 text-gray-400" /> : <Eye className="w-5 h-5 text-gray-400" />}
+                    <User className="w-4 h-4" />
+                    Student
                   </button>
-                </div>
-
-                {password && (
-                  <div className="space-y-1">
-                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(passwordStrength + 1) * 25}%` }}
-                        className={`h-full transition-all ${
-                          passwordStrength <= 1
-                            ? "bg-red-500"
-                            : passwordStrength === 2
-                            ? "bg-yellow-500"
-                            : passwordStrength === 3
-                            ? "bg-blue-500"
-                            : "bg-green-500"
-                        }`}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {["Too weak", "Weak", "Fair", "Good", "Strong"][passwordStrength]}
-                    </p>
-                  </div>
-                )}
-
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm Password"
-                    className={`w-full pl-12 pr-12 py-4 rounded-xl border-2 transition-all backdrop-blur ${
-                      theme === "light"
-                        ? "bg-white/70 border-gray-200 focus:border-indigo-500"
-                        : "bg-gray-700/70 border-gray-600 focus:border-purple-500 text-white"
-                    } outline-none focus:ring-2 focus:ring-indigo-500/20`}
-                  />
                   <button
                     type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2"
+                    onClick={() => setRole("tutor")}
+                    className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold flex items-center justify-center gap-2 transition ${
+                      role === "tutor"
+                        ? "border-amber-500 bg-amber-500/10 text-amber-400 shadow-lg"
+                        : "border-stone-800 bg-stone-900 text-stone-400 hover:text-white"
+                    }`}
                   >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5 text-gray-400" /> : <Eye className="w-5 h-5 text-gray-400" />}
+                    <BookOpen className="w-4 h-4" />
+                    Tutor
                   </button>
                 </div>
+              </div>
 
-                {error && (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-sm text-center">
-                    {error}
-                  </motion.p>
-                )}
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full pl-12 pr-4 py-3.5 bg-stone-900 border border-stone-800 rounded-xl text-sm text-stone-200 focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  disabled={registerLoading}
-                  className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
-                >
-                  {registerLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Create Account"}
-                </motion.button>
-              </motion.form>
-            )}
+              {error && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs text-center">
+                  {error}
+                </motion.p>
+              )}
 
-            {/* === GOOGLE OTP STAGE === */}
-            {stage === "google-otp" && (
-              <motion.div
-                key="google-otp"
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 50 }}
-                className="space-y-6"
+              <button
+                onClick={() => sendOtp(email)}
+                disabled={otpLoading || !email}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 text-sm disabled:opacity-70"
               >
-                <div className="text-center">
-                  <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-3" />
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    OTP sent to <strong>{googleEmail}</strong>
-                  </p>
-                </div>
+                {otpLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Send Verification OTP"}
+              </button>
 
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-stone-800" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-stone-950 px-3 text-stone-500 font-semibold tracking-wider">
+                    Or
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleGoogle}
+                disabled={googleLoading}
+                className="w-full py-3.5 bg-stone-900 border border-stone-800 hover:border-amber-500 text-stone-200 rounded-xl font-medium flex items-center justify-center gap-3 transition text-sm"
+              >
+                {googleLoading ? (
+                  <Loader2 className="animate-spin h-5 w-5" />
+                ) : (
+                  <>
+                    <FcGoogle className="w-5 h-5" />
+                    Continue with Google
+                  </>
+                )}
+              </button>
+
+              <p className="text-center text-xs text-stone-400">
+                Already have an account?{" "}
+                <Link href="/login" className="text-amber-400 font-bold hover:underline">
+                  Log in
+                </Link>
+              </p>
+            </motion.div>
+          )}
+
+          {/* === OTP STAGE (Manual) === */}
+          {stage === "otp" && (
+            <motion.div
+              key="otp"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}
+              className="space-y-6 text-center"
+            >
+              <div className="space-y-2">
+                <CheckCircle className="w-12 h-12 mx-auto text-amber-400 mb-2" />
+                <p className="text-sm text-stone-300">
+                  Enter the 6-digit verification code sent to <strong className="text-white">{email}</strong>
+                </p>
+              </div>
+
+              <input
+                type="text"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="w-full text-center text-3xl font-mono tracking-widest py-4 bg-stone-900 border border-stone-800 rounded-xl text-amber-400 focus:outline-none focus:border-amber-500"
+              />
+
+              {error && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs">
+                  {error}
+                </motion.p>
+              )}
+
+              <button
+                onClick={() => verifyOtp(email, otp)}
+                disabled={verifyLoading || otp.length !== 6}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl transition shadow-lg text-sm disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {verifyLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Verify OTP"}
+              </button>
+
+              <p className="text-xs text-stone-400">
+                {resendTimer > 0 ? (
+                  `Resend code in ${resendTimer}s`
+                ) : (
+                  <button
+                    onClick={() => sendOtp(email)}
+                    className="text-amber-400 underline font-medium"
+                    disabled={otpLoading}
+                  >
+                    Resend OTP
+                  </button>
+                )}
+              </p>
+            </motion.div>
+          )}
+
+          {/* === DETAILS STAGE (Manual) === */}
+          {stage === "details" && (
+            <motion.form
+              key="details"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}
+              onSubmit={handleManualRegister}
+              className="space-y-4"
+            >
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
                 <input
                   type="text"
-                  maxLength={6}
-                  value={googleOtp}
-                  onChange={(e) => setGoogleOtp(e.target.value.replace(/\D/g, ""))}
-                  placeholder="000000"
-                  className="w-full text-center text-3xl font-mono tracking-widest py-4 rounded-xl border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 outline-none backdrop-blur bg-white/70 dark:bg-gray-700/70"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Full Name"
+                  className="w-full pl-12 pr-4 py-3.5 bg-stone-900 border border-stone-800 rounded-xl text-sm text-stone-200 focus:outline-none focus:border-amber-500"
                 />
+              </div>
 
-                {error && (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-sm text-center">
-                    {error}
-                  </motion.p>
-                )}
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => verifyOtp(googleEmail, googleOtp, true)}
-                  disabled={verifyLoading || googleOtp.length !== 6}
-                  className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full pl-12 pr-12 py-3.5 bg-stone-900 border border-stone-800 rounded-xl text-sm text-stone-200 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
                 >
-                  {verifyLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Verify OTP"}
-                </motion.button>
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
 
-                <p className="text-center text-sm">
-                  {resendTimer > 0 ? (
-                    `Resend in ${resendTimer}s`
-                  ) : (
-                    <button
-                      onClick={() => sendOtp(googleEmail, true)}
-                      className="text-indigo-600 dark:text-indigo-400 underline"
-                      disabled={otpLoading}
-                    >
-                      Resend OTP
-                    </button>
-                  )}
-                </p>
-              </motion.div>
-            )}
-
-            {/* === GOOGLE DETAILS STAGE === */}
-            {stage === "google-details" && (
-              <motion.form
-                key="google-details"
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 50 }}
-                onSubmit={handleGoogleRegister}
-                className="space-y-6"
-              >
-                <div className="text-center mb-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Email: <strong>{googleEmail}</strong>
+              {password && (
+                <div className="space-y-1">
+                  <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(passwordStrength + 1) * 25}%` }}
+                      className={`h-full transition-all ${
+                        passwordStrength <= 1 ? "bg-red-500" : passwordStrength === 2 ? "bg-yellow-500" : "bg-amber-500"
+                      }`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-stone-400">
+                    Strength: {["Too weak", "Weak", "Fair", "Good", "Strong"][passwordStrength]}
                   </p>
                 </div>
+              )}
 
-                <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
-                  <input
-                    type="text"
-                    value={googleName}
-                    onChange={(e) => setGoogleName(e.target.value)}
-                    placeholder="Edit your name"
-                    className={`w-full pl-12 pr-4 py-4 rounded-xl border-2 transition-all backdrop-blur ${
-                      theme === "light"
-                        ? "bg-white/70 border-gray-200 focus:border-indigo-500"
-                        : "bg-gray-700/70 border-gray-600 focus:border-purple-500 text-white"
-                    } outline-none focus:ring-2 focus:ring-indigo-500/20`}
-                  />
-                </div>
-
-                {error && (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-sm text-center">
-                    {error}
-                  </motion.p>
-                )}
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  disabled={registerLoading}
-                  className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm Password"
+                  className="w-full pl-12 pr-12 py-3.5 bg-stone-900 border border-stone-800 rounded-xl text-sm text-stone-200 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
                 >
-                  {registerLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Complete Signup"}
-                </motion.button>
-              </motion.form>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
 
-        
-      
-      </main>
-    </>
+              {error && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs text-center">
+                  {error}
+                </motion.p>
+              )}
+
+              <button
+                type="submit"
+                disabled={registerLoading}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl transition shadow-lg text-sm disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {registerLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Complete Account Creation"}
+              </button>
+            </motion.form>
+          )}
+
+          {/* === GOOGLE OTP STAGE === */}
+          {stage === "google-otp" && (
+            <motion.div
+              key="google-otp"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}
+              className="space-y-6 text-center"
+            >
+              <div className="space-y-2">
+                <CheckCircle className="w-12 h-12 mx-auto text-amber-400 mb-2" />
+                <p className="text-sm text-stone-300">
+                  Enter verification OTP sent to <strong className="text-white">{googleEmail}</strong>
+                </p>
+              </div>
+
+              <input
+                type="text"
+                maxLength={6}
+                value={googleOtp}
+                onChange={(e) => setGoogleOtp(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="w-full text-center text-3xl font-mono tracking-widest py-4 bg-stone-900 border border-stone-800 rounded-xl text-amber-400 focus:outline-none focus:border-amber-500"
+              />
+
+              {error && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs">
+                  {error}
+                </motion.p>
+              )}
+
+              <button
+                onClick={() => verifyOtp(googleEmail, googleOtp, true)}
+                disabled={verifyLoading || googleOtp.length !== 6}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl transition shadow-lg text-sm disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {verifyLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Verify Google OTP"}
+              </button>
+            </motion.div>
+          )}
+
+          {/* === GOOGLE DETAILS STAGE === */}
+          {stage === "google-details" && (
+            <motion.form
+              key="google-details"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}
+              onSubmit={handleGoogleRegister}
+              className="space-y-6"
+            >
+              <div className="text-center mb-2">
+                <p className="text-xs text-stone-400">
+                  Email: <strong className="text-stone-200">{googleEmail}</strong>
+                </p>
+              </div>
+
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
+                <input
+                  type="text"
+                  value={googleName}
+                  onChange={(e) => setGoogleName(e.target.value)}
+                  placeholder="Full Name"
+                  className="w-full pl-12 pr-4 py-3.5 bg-stone-900 border border-stone-800 rounded-xl text-sm text-stone-200 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {error && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs text-center">
+                  {error}
+                </motion.p>
+              )}
+
+              <button
+                type="submit"
+                disabled={registerLoading}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl transition shadow-lg text-sm disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {registerLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Complete Google Signup"}
+              </button>
+            </motion.form>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
   );
 }
